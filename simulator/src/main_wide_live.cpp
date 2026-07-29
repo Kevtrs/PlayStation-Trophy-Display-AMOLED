@@ -16,6 +16,7 @@
 #include <lvgl.h>
 
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <string>
 #include <system_error>
@@ -33,8 +34,14 @@
 int main(int argc, char** argv) {
   bool exportOnly = false;
   int exportAfterMs = 15000;  // assez pour depasser plusieurs cycles de 3s
+  std::string exportPath = "simulator_wide_screenshots/live_after_cycle.png";
   for (int i = 1; i < argc; ++i) {
     if (std::string(argv[i]) == "--export-screenshot") exportOnly = true;
+    // Permet de capturer un slide precis (voir kSlideMs/loadSlide() dans
+    // WideUiBridge.cpp) pour generer les captures MakerWorld sans devoir
+    // relancer le cycle complet a chaque fois.
+    if (std::string(argv[i]) == "--export-at-ms" && i + 1 < argc) exportAfterMs = std::atoi(argv[++i]);
+    if (std::string(argv[i]) == "--export-path" && i + 1 < argc) exportPath = argv[++i];
   }
 
   const std::string dataDir = "simulator/.simulator_data/wide_live";
@@ -120,10 +127,10 @@ int main(int argc, char** argv) {
 
     if (exportOnly && static_cast<int>(nowMillis - startMs) >= exportAfterMs) {
       std::error_code mkEc;
-      std::filesystem::create_directories("simulator_wide_screenshots", mkEc);
-      DisplayDriverSdlWide::saveScreenshotPng("simulator_wide_screenshots/live_after_cycle.png");
-      std::printf("[live] Capture enregistree apres %dms : simulator_wide_screenshots/live_after_cycle.png\n",
-                  exportAfterMs);
+      std::filesystem::path outPath(exportPath);
+      std::filesystem::create_directories(outPath.parent_path(), mkEc);
+      DisplayDriverSdlWide::saveScreenshotPng(exportPath.c_str());
+      std::printf("[live] Capture enregistree apres %dms : %s\n", exportAfterMs, exportPath.c_str());
       running = false;
     }
 
