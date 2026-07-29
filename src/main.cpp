@@ -205,6 +205,16 @@ void setup() {
   captivePortalServer = new CaptivePortalServer(*appController);
 
   appController->begin();
+
+  // Veille desactivee par defaut : ecran d'affichage permanent (retour
+  // utilisateur du 2026-07-29 -- "il faut juste enlever la veille sur le
+  // amoled"). Applique a chaque demarrage (idempotent : reste a 0 en
+  // fonctionnement normal), meme mecanisme que main_7inch.cpp -- si un
+  // reglage de veille redevient souhaitable, le reactiver ici plutot que
+  // via le portail captif (qui serait ecrase au prochain redemarrage).
+  std::string patchError;
+  appController->applyConfigPatch(R"({"sleepTimeoutSeconds":0})", patchError);
+
   captivePortalServer->begin();
   Logger::info("Squelette fonctionnel demarre (mode %s, Wi-Fi + portail captif reels branches).",
                activeProvider == &demoProvider ? "demo" : "Pocket PSN");
