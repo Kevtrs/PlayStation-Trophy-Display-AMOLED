@@ -1,0 +1,86 @@
+{
+  "psn_name_tested": "TEST_PSN_USERNAME",
+  "timestamp": "20260716_111244",
+  "results": [
+    {
+      "target": "profile_page",
+      "url": "https://pocketpsn.com/TEST_PSN_USERNAME",
+      "http_status": 403,
+      "content_type": "text/html; charset=UTF-8",
+      "bot_challenge_detected": true,
+      "raw_html_saved": "C:\\Users\\kevin\\Projects\\PlayStation-Trophy-Display-AMOLED\\tools\\pocketpsn_public_probe\\output\\profile_page_20260716_111244.html",
+      "anonymized_fixture": "C:\\Users\\kevin\\Projects\\PlayStation-Trophy-Display-AMOLED\\tools\\pocketpsn_public_probe\\fixtures\\profile_page_anonymized.html",
+      "embedded_json_scripts": [],
+      "public_api_urls_found": [],
+      "recoverable_profile_fields": []
+    },
+    {
+      "target": "domain_root",
+      "url": "https://pocketpsn.com/",
+      "http_status": 403,
+      "content_type": "text/html; charset=UTF-8",
+      "bot_challenge_detected": true,
+      "raw_html_saved": "C:\\Users\\kevin\\Projects\\PlayStation-Trophy-Display-AMOLED\\tools\\pocketpsn_public_probe\\output\\domain_root_20260716_111244.html",
+      "anonymized_fixture": "C:\\Users\\kevin\\Projects\\PlayStation-Trophy-Display-AMOLED\\tools\\pocketpsn_public_probe\\fixtures\\domain_root_anonymized.html",
+      "embedded_json_scripts": [],
+      "public_api_urls_found": [],
+      "recoverable_profile_fields": []
+    },
+    {
+      "target": "robots_txt",
+      "url": "https://pocketpsn.com/robots.txt",
+      "http_status": 403,
+      "content_type": "text/html; charset=UTF-8",
+      "bot_challenge_detected": true,
+      "raw_html_saved": "C:\\Users\\kevin\\Projects\\PlayStation-Trophy-Display-AMOLED\\tools\\pocketpsn_public_probe\\output\\robots_txt_20260716_111244.html",
+      "anonymized_fixture": "C:\\Users\\kevin\\Projects\\PlayStation-Trophy-Display-AMOLED\\tools\\pocketpsn_public_probe\\fixtures\\robots_txt_anonymized.html",
+      "embedded_json_scripts": [],
+      "public_api_urls_found": [],
+      "recoverable_profile_fields": []
+    },
+    {
+      "target": "sitemap_xml",
+      "url": "https://pocketpsn.com/sitemap.xml",
+      "http_status": 403,
+      "content_type": "text/html; charset=UTF-8",
+      "bot_challenge_detected": true,
+      "raw_html_saved": "C:\\Users\\kevin\\Projects\\PlayStation-Trophy-Display-AMOLED\\tools\\pocketpsn_public_probe\\output\\sitemap_xml_20260716_111244.html",
+      "anonymized_fixture": "C:\\Users\\kevin\\Projects\\PlayStation-Trophy-Display-AMOLED\\tools\\pocketpsn_public_probe\\fixtures\\sitemap_xml_anonymized.html",
+      "embedded_json_scripts": [],
+      "public_api_urls_found": [],
+      "recoverable_profile_fields": []
+    }
+  ],
+  "summary": {
+    "all_targets_blocked_by_bot_challenge": true,
+    "recoverable_profile_fields": [],
+    "public_api_urls_found": [],
+    "expected_parser_fields_reference": [
+      "Status",
+      "Username",
+      "Country",
+      "PSN Level",
+      "PSN Level Progress",
+      "PSN Level Remaining",
+      "Trophies Bronze",
+      "Trophies Silver",
+      "Trophies Gold",
+      "Trophies Plats",
+      "Trophies Total",
+      "Trophy Points",
+      "Pocket Points",
+      "Total Games",
+      "World Rank",
+      "Country Rank",
+      "Quick Stats",
+      "Games Completed",
+      "Completion Average",
+      "Average Rarity",
+      "Unearned Trophies",
+      "Hours Played"
+    ],
+    "missing": [
+      "Toutes les ressources testees (page de profil, racine du domaine, robots.txt, sitemap.xml) renvoient un defi anti-robot Cloudflare (HTTP 403, en-tete cf-mitigated=challenge, page 'Just a moment...'). Aucune donnee de profil, aucun script JSON embarque, aucune URL d'API publique n'a pu etre observee sans executer le defi JavaScript -- ce que cet outil ne fait jamais (voir consigne : ne contourner aucune protection)."
+    ]
+  }
+}

@@ -1,0 +1,4 @@
+output/
+fixtures/
+*.key
+*key*.txt

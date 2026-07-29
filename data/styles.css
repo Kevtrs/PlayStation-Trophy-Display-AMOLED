@@ -1,0 +1,622 @@
+:root {
+  color-scheme: dark;
+  --bg: #050711;
+  --panel: #0c1220;
+  --panel-strong: #111a2c;
+  --line: #24314c;
+  --text: #f4f8ff;
+  --muted: #95a4bd;
+  --faint: #66738a;
+  --blue: #2f7cff;
+  --cyan: #27d8ff;
+  --green: #42f5a7;
+  --yellow: #ffd166;
+  --red: #ff5c7a;
+  --radius: 18px;
+  --shadow: 0 22px 60px rgba(0, 0, 0, 0.34);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at 50% -10%, rgba(47, 124, 255, 0.22), transparent 34rem),
+    radial-gradient(circle at 90% 10%, rgba(39, 216, 255, 0.11), transparent 20rem),
+    var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  touch-action: manipulation;
+}
+
+.app-shell {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 20px 16px calc(32px + var(--safe-bottom));
+}
+
+.topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 2px 18px;
+}
+
+/* Visible sans avoir a lire une seule ligne de francais -- demande
+   explicite utilisateur (2026-07-28) : le reglage "Langue" cache dans
+   "Reglages avances" etait injoignable pour qui ne lit pas le francais. */
+.lang-switch {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 2px 2px 0;
+}
+
+.lang-btn {
+  min-height: 32px;
+  min-width: 48px;
+  padding: 0 12px;
+  border: 1px solid rgba(39, 216, 255, 0.34);
+  border-radius: 999px;
+  background: rgba(14, 24, 42, 0.8);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.lang-btn.is-active {
+  background: linear-gradient(135deg, var(--blue), var(--cyan));
+  color: #ffffff;
+  border-color: transparent;
+}
+
+.eyebrow,
+.section-kicker {
+  margin: 0 0 6px;
+  color: var(--cyan);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+h1,
+h2 {
+  margin: 0;
+  line-height: 1.08;
+}
+
+h1 {
+  font-size: clamp(1.7rem, 7vw, 3.1rem);
+}
+
+h2 {
+  font-size: clamp(1.08rem, 3.4vw, 1.35rem);
+}
+
+p {
+  line-height: 1.5;
+}
+
+main {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.hero-panel,
+.card,
+.danger-zone,
+.mock-panel {
+  border: 1px solid rgba(55, 78, 118, 0.78);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, rgba(17, 26, 44, 0.94), rgba(9, 14, 26, 0.92));
+  box-shadow: var(--shadow);
+}
+
+.hero-panel {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+}
+
+.hero-panel p {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.hero-grid div {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(39, 216, 255, 0.28);
+  border-radius: 14px;
+  background: rgba(8, 16, 31, 0.8);
+}
+
+.hero-grid span,
+.diagnostic-grid dt {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.hero-grid strong,
+.diagnostic-grid dd {
+  display: block;
+  margin: 5px 0 0;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 760;
+  overflow-wrap: anywhere;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid rgba(39, 216, 255, 0.45);
+  border-radius: 999px;
+  background: rgba(8, 17, 33, 0.82);
+  color: var(--muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--yellow);
+  box-shadow: 0 0 18px rgba(255, 209, 102, 0.8);
+}
+
+.status-pill.is-ok .dot {
+  background: var(--green);
+  box-shadow: 0 0 18px rgba(66, 245, 167, 0.8);
+}
+
+.status-pill.is-bad .dot {
+  background: var(--red);
+  box-shadow: 0 0 18px rgba(255, 92, 122, 0.8);
+}
+
+.card,
+.danger-zone,
+.mock-panel {
+  padding: 16px;
+}
+
+.card-heading,
+.danger-zone,
+.mock-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mock-panel {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.scenario-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scenario-list a {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  padding: 7px 10px;
+  border: 1px solid rgba(39, 216, 255, 0.32);
+  border-radius: 999px;
+  color: var(--text);
+  background: rgba(8, 16, 31, 0.72);
+  text-decoration: none;
+  font-size: 0.82rem;
+}
+
+.field,
+.range-field {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/* .field ci-dessus fixe "display: grid" inconditionnellement -- plus
+   specifique que la regle UA "[hidden] { display: none }", donc l'attribut
+   HTML hidden serait sinon silencieusement ignore sur .field#ssidManualField
+   (retour utilisateur du 2026-07-29, ajout de la saisie manuelle du SSID). */
+.field[hidden] {
+  display: none;
+}
+
+label {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+input[type="text"],
+input[type="password"],
+select {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid rgba(72, 96, 140, 0.82);
+  border-radius: 14px;
+  background: #070d19;
+  color: var(--text);
+  outline: none;
+  padding: 0 13px;
+}
+
+input:focus,
+select:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 4px rgba(39, 216, 255, 0.13);
+}
+
+.button-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.primary-button,
+.ghost-button,
+.danger-button {
+  min-height: 44px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  padding: 0 16px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.primary-button {
+  background: linear-gradient(135deg, var(--blue), var(--cyan));
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.ghost-button {
+  border-color: rgba(39, 216, 255, 0.34);
+  background: rgba(14, 24, 42, 0.8);
+}
+
+.danger-button {
+  background: rgba(255, 92, 122, 0.13);
+  border-color: rgba(255, 92, 122, 0.62);
+  color: #ffb7c4;
+  font-weight: 800;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.inline-status {
+  min-width: 0;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
+.value-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 54px;
+  min-height: 32px;
+  border: 1px solid rgba(39, 216, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(8, 16, 31, 0.78);
+  color: var(--cyan);
+  font-weight: 800;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--cyan);
+}
+
+.switch-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.switch-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 62px;
+  padding: 12px;
+  border: 1px solid rgba(72, 96, 140, 0.52);
+  border-radius: 14px;
+  background: rgba(5, 9, 18, 0.42);
+}
+
+.switch-row strong {
+  display: block;
+  color: var(--text);
+  font-size: 0.94rem;
+}
+
+.switch-row small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.switch-row input {
+  width: 48px;
+  height: 28px;
+  accent-color: var(--cyan);
+}
+
+.two-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.diagnostic-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0 0;
+}
+
+.diagnostic-grid div {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(72, 96, 140, 0.52);
+  border-radius: 14px;
+  background: rgba(5, 9, 18, 0.42);
+}
+
+.diagnostic-grid dt,
+.diagnostic-grid dd {
+  margin: 0;
+}
+
+.raw-box {
+  overflow: auto;
+  max-height: 220px;
+  margin: 14px 0 0;
+  padding: 12px;
+  border: 1px solid rgba(72, 96, 140, 0.52);
+  border-radius: 14px;
+  background: #03070f;
+  color: #b9c5d9;
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.danger-zone {
+  align-items: flex-start;
+}
+
+.danger-actions {
+  margin-top: 0;
+  justify-content: flex-end;
+}
+
+.toast-stack {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + var(--safe-bottom));
+  z-index: 50;
+  display: grid;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  width: min(520px, 100%);
+  margin: 0 auto;
+  padding: 12px 14px;
+  border: 1px solid rgba(39, 216, 255, 0.32);
+  border-radius: 14px;
+  background: rgba(8, 16, 31, 0.96);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.toast.is-error {
+  border-color: rgba(255, 92, 122, 0.66);
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.68);
+}
+
+.modal-card {
+  width: min(440px, 100%);
+  padding: 18px;
+  border: 1px solid rgba(255, 92, 122, 0.58);
+  border-radius: 20px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.modal-card p {
+  color: var(--muted);
+}
+
+.hidden {
+  display: none !important;
+}
+
+@media (min-width: 760px) {
+  .app-shell {
+    padding-top: 28px;
+  }
+
+  main {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hero-panel,
+  .mock-panel,
+  form,
+  .danger-zone {
+    grid-column: 1 / -1;
+  }
+
+  form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .hero-panel {
+    grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.8fr);
+    align-items: center;
+  }
+}
+
+@media (max-width: 540px) {
+  .topbar {
+    flex-direction: column;
+  }
+
+  .status-pill {
+    align-self: flex-start;
+  }
+
+  .card-heading,
+  .danger-zone {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .two-cols,
+  .diagnostic-grid,
+  .hero-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .primary-button,
+  .ghost-button,
+  .danger-button {
+    width: 100%;
+  }
+
+  .button-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .danger-actions {
+    width: 100%;
+  }
+}
+
+/* Reglages avances / diagnostics : replies par defaut (voir "idiot proof",
+   demande explicite de l'utilisateur -- seuls Wi-Fi + pseudo PSN +
+   Enregistrer restent visibles au premier coup d'oeil). */
+.advanced-settings > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 640;
+  user-select: none;
+}
+
+.advanced-settings > summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-settings > summary::before {
+  content: "\25B8";
+  display: inline-block;
+  transition: transform 160ms ease;
+  color: var(--cyan);
+}
+
+.advanced-settings[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+details.card.advanced-settings {
+  padding-bottom: 4px;
+}
+
+details.card.advanced-settings[open] {
+  padding-bottom: 16px;
+}
+
+details.card.advanced-settings > summary {
+  margin-bottom: 0;
+}
+
+details.card.advanced-settings[open] > summary {
+  margin-bottom: 16px;
+}
+
+details.card.advanced-settings > .card-heading:first-of-type {
+  margin-top: 0;
+}
+
+main > details.advanced-settings {
+  display: grid;
+  gap: 16px;
+}
+
+main > details.advanced-settings > summary {
+  padding: 4px 2px;
+}

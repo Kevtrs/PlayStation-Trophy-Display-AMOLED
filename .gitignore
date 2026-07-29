@@ -1,0 +1,29 @@
+.pio/
+.pioenvs/
+.piolibdeps/
+.vscode/
+*.o
+*.bin
+*.elf
+
+# Simulateur PC : artefacts de build et captures regenerables (voir simulator/README.md)
+simulator/build/
+simulator/build_check/
+simulator/screenshots/
+simulator/.simulator_data/
+tools/pocketpsn_probe/output/
+
+# Logs generes par scripts/installer_et_lancer.ps1 et scripts/diagnostic_materiel.ps1
+# (voir PREMIER_DEMARRAGE.md) -- jamais commiter, y compris en cas de partage de bug.
+logs/*.log
+
+# Cle API Pocket PSN partagee, compilee dans le firmware (voir
+# include/secrets.example.h et AUDIT.md section 0quater) -- jamais committee.
+include/secrets.h
+
+# Binaires de release pour la page d'installation web (voir
+# webinstall/README.md) : exception volontaire a "*.bin" ci-dessus --
+# ce sont ici des artefacts distribuables, pas des sorties de build a usage
+# interne uniquement.
+!webinstall/firmware/*.bin
+!webinstall_7inch/firmware/*.bin

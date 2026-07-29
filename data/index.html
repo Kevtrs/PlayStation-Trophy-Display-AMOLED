@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#050711">
+  <title>Trophy Display - Configuration</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="lang-switch" id="langSwitch" role="group" aria-label="FR / EN">
+      <button type="button" class="lang-btn" data-lang="fr">FR</button>
+      <button type="button" class="lang-btn" data-lang="en">EN</button>
+    </div>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">PlayStation Trophy Display</p>
+        <h1 data-i18n="heading">Configuration locale</h1>
+      </div>
+      <div class="status-pill" id="connectionPill">
+        <span class="dot"></span>
+        <span id="connectionText" data-i18n="connLoading">Chargement</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero-panel">
+        <div>
+          <p class="section-kicker" data-i18n="deviceStateKicker">Etat appareil</p>
+          <h2 id="setupTitle" data-i18n="setupTitleLoading">Lecture de l'etat</h2>
+          <p id="setupSubtitle" data-i18n="setupSubtitleLoading">Connexion a l'interface locale...</p>
+        </div>
+        <div class="hero-grid" aria-label="Etat de synchronisation">
+          <div>
+            <span data-i18n="networkLabel">Reseau</span>
+            <strong id="networkState">-</strong>
+          </div>
+          <div>
+            <span data-i18n="lastSyncLabel">Derniere sync</span>
+            <strong id="lastSync">-</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="mock-panel hidden" id="mockPanel" aria-label="Scenarios mock">
+        <div>
+          <p class="section-kicker" data-i18n="mockKicker">Mock local</p>
+          <h2 data-i18n="mockHeading">Scenarios de test</h2>
+        </div>
+        <div class="scenario-list" id="scenarioList"></div>
+      </section>
+
+      <form id="configForm" novalidate>
+        <section class="card">
+          <div class="card-heading">
+            <div>
+              <p class="section-kicker" data-i18n="wifiKicker">Wi-Fi</p>
+              <h2 data-i18n="wifiHeading">Connexion reseau</h2>
+            </div>
+            <button class="ghost-button" type="button" id="scanButton" data-i18n="scanButton">Scanner</button>
+          </div>
+
+          <div class="field">
+            <label for="ssidSelect" data-i18n="ssidLabel">Reseau detecte</label>
+            <select id="ssidSelect" name="ssid"></select>
+          </div>
+
+          <div class="field" id="ssidManualField" hidden>
+            <label for="ssidManual" data-i18n="ssidManualLabel">Nom du reseau (SSID)</label>
+            <input id="ssidManual" name="ssidManual" type="text" autocapitalize="none" autocomplete="off" maxlength="32" data-i18n-placeholder="ssidManualPlaceholder" placeholder="Nom exact de votre reseau Wi-Fi">
+          </div>
+
+          <div class="field">
+            <label for="wifiPassword" data-i18n="passwordLabel">Mot de passe</label>
+            <input id="wifiPassword" name="password" type="password" autocomplete="current-password" placeholder="Mot de passe Wi-Fi" data-i18n-placeholder="passwordPlaceholder">
+          </div>
+
+          <p class="inline-status" id="wifiStatus" data-i18n="wifiStatusIdle">Aucun scan lance.</p>
+        </section>
+
+        <section class="card">
+          <div class="card-heading">
+            <div>
+              <p class="section-kicker" data-i18n="profileKicker">Profil</p>
+              <h2 data-i18n="profileHeading">Compte PSN</h2>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="psnUsername" data-i18n="psnUsernameLabel">Pseudo PSN</label>
+            <input id="psnUsername" name="psnUsername" type="text" autocapitalize="none" autocomplete="nickname" placeholder="Kevin_Trophies" maxlength="32">
+          </div>
+
+          <p class="inline-status" id="pocketPsnKeyStatus" data-i18n="keyStatusUnknown">Statut de la cle inconnu.</p>
+
+          <p class="inline-status">
+            <span data-i18n="pocketPsnCredit">Donnees PlayStation fournies par</span> <a href="https://pocketpsn.com" target="_blank" rel="noopener">Pocket PSN</a>.
+          </p>
+        </section>
+
+        <section class="card">
+          <div class="button-row">
+            <button class="primary-button" type="submit" id="saveButton" data-i18n="saveButton">Enregistrer</button>
+            <p class="inline-status" id="saveStatus" data-i18n="saveStatusReady">Pret.</p>
+          </div>
+        </section>
+
+        <details class="card advanced-settings">
+          <summary data-i18n="advancedSettings">Reglages avances</summary>
+
+          <div class="card-heading">
+            <div>
+              <p class="section-kicker" data-i18n="displayKicker">Affichage</p>
+              <h2 data-i18n="displayHeading">Reglages ecran</h2>
+            </div>
+            <span class="value-badge" id="brightnessValue">82%</span>
+          </div>
+
+          <div class="range-field">
+            <label for="brightness" data-i18n="brightnessLabel">Luminosite</label>
+            <input id="brightness" name="brightness" type="range" min="10" max="100" step="1">
+          </div>
+
+          <div class="switch-grid">
+            <label class="switch-row">
+              <span>
+                <strong data-i18n="sleepTitle">Veille</strong>
+                <small data-i18n="sleepDesc">Reduit la luminosite apres inactivite.</small>
+              </span>
+              <input id="sleepEnabled" name="sleepEnabled" type="checkbox">
+            </label>
+
+            <label class="switch-row">
+              <span>
+                <strong data-i18n="rotationTitle">Rotation automatique</strong>
+                <small data-i18n="rotationDesc">Alterner les ecrans principaux.</small>
+              </span>
+              <input id="autoRotation" name="autoRotation" type="checkbox">
+            </label>
+
+            <label class="switch-row">
+              <span>
+                <strong data-i18n="animationsTitle">Animations</strong>
+                <small data-i18n="animationsDesc">Transitions et micro-interactions LVGL.</small>
+              </span>
+              <input id="animations" name="animations" type="checkbox">
+            </label>
+          </div>
+
+          <div class="two-cols">
+            <div class="field">
+              <label for="rotationDelay" data-i18n="rotationDelayLabel">Delai rotation</label>
+              <select id="rotationDelay" name="rotationDelay">
+                <option value="10">10 s</option>
+                <option value="20">20 s</option>
+                <option value="30">30 s</option>
+                <option value="60">60 s</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="sleepDelay" data-i18n="sleepDelayLabel">Delai veille</label>
+              <select id="sleepDelay" name="sleepDelay">
+                <option value="1">1 min</option>
+                <option value="3">3 min</option>
+                <option value="5">5 min</option>
+                <option value="10">10 min</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="card-heading">
+            <div>
+              <p class="section-kicker" data-i18n="syncKicker">Synchronisation</p>
+              <h2 data-i18n="syncHeading">Donnees trophées</h2>
+            </div>
+            <button class="ghost-button" type="button" id="syncNowButton" data-i18n="syncNowButton">Synchroniser</button>
+          </div>
+
+          <div class="two-cols">
+            <div class="field">
+              <label for="language" data-i18n="languageLabel">Langue</label>
+              <select id="language" name="language">
+                <option value="fr">Francais</option>
+                <option value="en">English</option>
+                <option value="es">Espanol</option>
+                <option value="de">Deutsch</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="syncInterval" data-i18n="syncIntervalLabel">Intervalle de synchro</label>
+              <select id="syncInterval" name="syncInterval">
+                <option value="15">15 min</option>
+                <option value="30">30 min</option>
+                <option value="60">1 h</option>
+                <option value="180">3 h</option>
+                <option value="360">6 h</option>
+              </select>
+            </div>
+          </div>
+        </details>
+      </form>
+
+      <details class="advanced-settings">
+        <summary data-i18n="diagMaintenance">Diagnostics et maintenance</summary>
+
+        <section class="card">
+          <div class="card-heading">
+            <div>
+              <p class="section-kicker" data-i18n="diagKicker">Diagnostics</p>
+              <h2 data-i18n="diagHeading">Etat systeme</h2>
+            </div>
+            <button class="ghost-button" type="button" id="refreshDiagnosticsButton" data-i18n="diagRefresh">Actualiser</button>
+          </div>
+          <dl class="diagnostic-grid" id="diagnosticsGrid"></dl>
+          <pre id="diagnosticsRaw" class="raw-box" aria-label="Diagnostics bruts"></pre>
+        </section>
+
+        <section class="danger-zone">
+          <div>
+            <p class="section-kicker" data-i18n="maintenanceKicker">Maintenance</p>
+            <h2 data-i18n="maintenanceHeading">Actions appareil</h2>
+          </div>
+          <div class="button-row danger-actions">
+            <button class="ghost-button" type="button" id="rebootButton" data-i18n="rebootButton">Redemarrer</button>
+            <button class="danger-button" type="button" id="resetButton" data-i18n="resetButton">Reinitialiser</button>
+          </div>
+        </section>
+      </details>
+    </main>
+  </div>
+
+  <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="true"></div>
+
+  <div class="modal hidden" id="resetModal" role="dialog" aria-modal="true" aria-labelledby="resetTitle">
+    <div class="modal-card">
+      <h2 id="resetTitle" data-i18n="resetModalTitle">Confirmer la reinitialisation</h2>
+      <p data-i18n="resetModalDesc">Cette action efface la configuration locale. Tapez RESET pour confirmer.</p>
+      <input id="resetConfirmInput" type="text" autocomplete="off" autocapitalize="characters" placeholder="RESET">
+      <div class="button-row">
+        <button class="ghost-button" type="button" id="cancelResetButton" data-i18n="resetCancel">Annuler</button>
+        <button class="danger-button" type="button" id="confirmResetButton" data-i18n="resetConfirm">Confirmer</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./app.js" defer></script>
+</body>
+</html>

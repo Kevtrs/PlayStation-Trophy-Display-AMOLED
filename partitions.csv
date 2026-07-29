@@ -1,0 +1,16 @@
+# Table de partitions pour Flash 16 Mo (module N16R8, PSRAM Octal 8 Mo).
+# Revisee le 2026-07-15 (voir docs/PARTITIONS.md pour le detail complet et
+# le compromis avec/sans OTA) : app0/app1 portes de 3 Mo a 4 Mo chacun car
+# l'app etait deja a 85.2% de 3 Mo apres l'ajout du seul WiFiManager, avant
+# meme le serveur web/portail captif -- 4 Mo ramene l'usage courant a ~64%
+# et laisse de la marge pour le portail captif + une future UI web servie
+# depuis LittleFS (jamais compilee dans le binaire applicatif). Deux slots
+# OTA conserves (voir docs/PARTITIONS.md) : LittleFS passe de ~9.94 Mo a
+# ~7.94 Mo en echange, ce qui reste tres largement suffisant (config, cache
+# de trophees et assets web pesent au plus quelques Mo).
+# Name,     Type, SubType,  Offset,   Size
+nvs,        data, nvs,      0x9000,   0x5000,
+otadata,    data, ota,      0xe000,   0x2000,
+app0,       app,  ota_0,    0x10000,  0x400000,
+app1,       app,  ota_1,    0x410000, 0x400000,
+littlefs,   data, spiffs,   0x810000, 0x7F0000,
