@@ -1,10 +1,9 @@
 # PlayStation Trophy Display -- afficheur de trophées (écran 7" tactile)
 
 > Texte prêt à copier-coller dans la description de la page MakerWorld.
-> Réglages d'impression extraits du projet Bambu Studio fourni
-> (`PocketPSN Trophy.3mf`). Le temps d'impression et le poids de
-> filament exacts dépendent de votre trancheur -- non inclus dans le
-> fichier projet (jamais tranché).
+> Réglages et estimations extraits du projet Bambu Studio fourni
+> (`PocketPSN Trophy.3mf`, tranché sur Bambu Lab X1 Carbon). Peut varier
+> légèrement avec une autre imprimante.
 
 ## Accroche
 
@@ -64,8 +63,11 @@ par le module, sert lui-même de façade -- pas de capot supplémentaire).
 - Parois : 2
 - Remplissage : 5 %
 - Supports : oui (arborescents automatiques)
-- Temps d'impression et poids de filament : dépendent de votre
-  trancheur/imprimante -- non fournis avec le projet 3D
+- Poids de filament : ~123 g
+- Temps d'impression : ~3 h 25
+
+*(Estimations Bambu Studio, imprimante et profil ci-dessus -- peut
+varier avec un autre matériel.)*
 
 ## Montage
 

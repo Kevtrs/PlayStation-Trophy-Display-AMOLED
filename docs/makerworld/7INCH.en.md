@@ -1,9 +1,9 @@
 # PlayStation Trophy Display -- trophy display (7" touchscreen)
 
 > Ready-to-paste text for the MakerWorld page description.
-> Print settings extracted from the provided Bambu Studio project
-> (`PocketPSN Trophy.3mf`). Exact print time and filament weight depend
-> on your slicer -- not included in the project file (never sliced).
+> Settings and estimates extracted from the provided Bambu Studio
+> project (`PocketPSN Trophy.3mf`, sliced on a Bambu Lab X1 Carbon).
+> May vary slightly with a different printer.
 
 ## Hook
 
@@ -62,8 +62,11 @@ there's no separate front cover).
 - Wall loops: 2
 - Infill: 5%
 - Supports: yes (tree, automatic)
-- Print time and filament weight: depend on your slicer/printer -- not
-  included with the 3D project
+- Filament weight: ~123 g
+- Print time: ~3h25
+
+*(Bambu Studio estimates, printer and profile above -- may vary with
+other hardware.)*
 
 ## Assembly
 
