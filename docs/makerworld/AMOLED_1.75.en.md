@@ -1,8 +1,9 @@
 # PlayStation Trophy Display -- trophy display (round AMOLED screen)
 
 > Ready-to-paste text for the MakerWorld page description.
-> Sections in `[...]` still need real print info (material, settings,
-> time) -- everything else is verified and accurate.
+> Print settings extracted from the provided Bambu Studio project
+> (`PocketPSN Trophy.3mf`). Exact print time and filament weight depend
+> on your slicer -- not included in the project file (never sliced).
 
 ## Hook
 
@@ -45,25 +46,35 @@ on the screen, over Wi-Fi.
 - A USB-C cable (data-capable, not charge-only)
 - An active [Pocket PSN](https://pocketpsn.com) account (free
   third-party service that provides PlayStation trophy data)
-- [PRINT MATERIAL -- e.g. PLA, X g]
-- [SCREWS / HEAT-SET INSERTS if needed, quantity and size]
+- PLA filament -- white for the body, blue for the embossed PlayStation
+  logo and accent shape (optional: printable in a single color if you
+  don't have an AMS/filament changer)
+- 3 small magnets (case closure -- no screws needed for the case itself)
 
 ## 3D printing
 
-- Recommended material: [TO FILL IN]
-- Color used in the photos: [TO FILL IN]
-- Layer height: [TO FILL IN]
-- Infill: [TO FILL IN]
-- Supports: [TO FILL IN -- yes/no, which parts]
-- Estimated total print time: [TO FILL IN]
-- Recommended orientation: [TO FILL IN]
+The case is **2 parts**: a front cover and a back shell, held together
+with magnets (no screws). The back shell carries the PlayStation logo
+and a decorative accent, embossed in a second color.
+
+- Printer used for the design: Bambu Lab X1 Carbon (0.4 mm nozzle)
+- Material: PLA -- white (body), blue (embossed logo/accent)
+- Profile: "0.28mm Extra Draft" (fast print)
+- Layer height: 0.28 mm (first layer 0.2 mm)
+- Wall loops: 2
+- Infill: 5%
+- Supports: yes (tree, automatic)
+- Print time and filament weight: depend on your slicer/printer -- not
+  included with the 3D project
 
 ## Assembly
 
-1. [Step 1 -- e.g. insert the Waveshare board into the front housing]
-2. [Step 2 -- e.g. secure with the provided screws]
-3. [Step 3 -- e.g. route the USB-C cable through the rear opening]
-4. [Step 4 -- e.g. close the housing]
+1. Print the front cover and back shell (see settings above).
+2. Insert the 3 magnets into their sockets on the back shell.
+3. Place the Waveshare board into the front cover.
+4. Route the USB-C cable through the provided opening.
+5. Close with the back shell -- the magnets hold everything together,
+   no screws needed.
 
 ## Installing the firmware (no technical skills required)
 

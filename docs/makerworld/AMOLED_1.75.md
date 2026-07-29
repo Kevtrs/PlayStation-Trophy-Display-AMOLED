@@ -1,9 +1,10 @@
 # PlayStation Trophy Display -- afficheur de trophées (écran rond AMOLED)
 
 > Texte prêt à copier-coller dans la description de la page MakerWorld.
-> Les passages entre crochets `[...]` sont à compléter avec les infos
-> d'impression réelles (matériau, réglages, temps) -- tout le reste est
-> vérifié et exact.
+> Réglages d'impression extraits du projet Bambu Studio fourni
+> (`PocketPSN Trophy.3mf`). Le temps d'impression et le poids de
+> filament exacts dépendent de votre trancheur -- non inclus dans le
+> fichier projet (jamais tranché).
 
 ## Accroche
 
@@ -47,25 +48,36 @@ se configure directement sur l'écran, en Wi-Fi.
 - Un câble USB-C (données, pas seulement charge)
 - Un compte [Pocket PSN](https://pocketpsn.com) actif (gratuit, service
   tiers qui fournit les données de trophées PlayStation)
-- [MATÉRIAU D'IMPRESSION -- ex : PLA, X g]
-- [VISSERIE / INSERTS À CHAUD si nécessaire, quantité et taille]
+- Filament PLA -- blanc pour le corps, bleu pour le logo PlayStation et
+  le motif gravés (optionnel : imprimable en une seule couleur si vous
+  n'avez pas d'AMS/changeur de filament)
+- 3 petits aimants (fermeture du boîtier -- pas de vis nécessaires pour
+  le boîtier lui-même)
 
 ## Impression 3D
 
-- Matériau recommandé : [À COMPLÉTER]
-- Couleur utilisée sur les photos : [À COMPLÉTER]
-- Hauteur de couche : [À COMPLÉTER]
-- Remplissage : [À COMPLÉTER]
-- Supports : [À COMPLÉTER -- oui/non, quelles pièces]
-- Temps d'impression total estimé : [À COMPLÉTER]
-- Orientation recommandée : [À COMPLÉTER]
+Le boîtier tient en **2 pièces** : une façade et un dos, assemblées par
+aimants (aucune vis). Le dos porte le logo PlayStation et un motif
+décoratif, gravés en 2ᵉ couleur.
+
+- Imprimante utilisée pour la conception : Bambu Lab X1 Carbon (buse 0,4 mm)
+- Matériau : PLA -- blanc (corps), bleu (logo/motif gravés)
+- Profil : "0,28 mm Extra Draft" (impression rapide)
+- Hauteur de couche : 0,28 mm (première couche 0,2 mm)
+- Parois : 2
+- Remplissage : 5 %
+- Supports : oui (arborescents automatiques)
+- Temps d'impression et poids de filament : dépendent de votre
+  trancheur/imprimante -- non fournis avec le projet 3D
 
 ## Montage
 
-1. [Étape 1 -- ex : insérer la carte Waveshare dans le boîtier avant]
-2. [Étape 2 -- ex : fixer avec les vis fournies]
-3. [Étape 3 -- ex : faire passer le câble USB-C par l'ouverture arrière]
-4. [Étape 4 -- ex : refermer le boîtier]
+1. Imprimez la façade et le dos (voir réglages ci-dessus).
+2. Insérez les 3 aimants dans leurs logements sur le dos.
+3. Placez la carte Waveshare dans la façade.
+4. Faites passer le câble USB-C par l'ouverture prévue.
+5. Refermez avec le dos -- les aimants maintiennent l'ensemble, aucune
+   vis nécessaire.
 
 ## Installer le firmware (aucune compétence technique requise)
 

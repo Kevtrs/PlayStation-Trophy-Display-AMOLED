@@ -1,9 +1,10 @@
 # PlayStation Trophy Display -- afficheur de trophées (écran 7" tactile)
 
 > Texte prêt à copier-coller dans la description de la page MakerWorld.
-> Les passages entre crochets `[...]` sont à compléter avec les infos
-> d'impression réelles (matériau, réglages, temps) -- tout le reste est
-> vérifié et exact.
+> Réglages d'impression extraits du projet Bambu Studio fourni
+> (`PocketPSN Trophy.3mf`). Le temps d'impression et le poids de
+> filament exacts dépendent de votre trancheur -- non inclus dans le
+> fichier projet (jamais tranché).
 
 ## Accroche
 
@@ -46,25 +47,32 @@ se configure directement sur l'écran, en Wi-Fi.
 - Un câble USB-C (données, pas seulement charge)
 - Un compte [Pocket PSN](https://pocketpsn.com) actif (gratuit, service
   tiers qui fournit les données de trophées PlayStation)
-- [MATÉRIAU D'IMPRESSION -- ex : PLA, X g]
-- [VISSERIE / INSERTS À CHAUD si nécessaire, quantité et taille]
+- Filament PLA (une seule couleur suffit pour ce boîtier)
+- 2 vis (taille à confirmer selon vos inserts/taraudage -- 2 plots de
+  fixation sont prévus à l'intérieur du support)
 
 ## Impression 3D
 
-- Matériau recommandé : [À COMPLÉTER]
-- Couleur utilisée sur les photos : [À COMPLÉTER]
-- Hauteur de couche : [À COMPLÉTER]
-- Remplissage : [À COMPLÉTER]
-- Supports : [À COMPLÉTER -- oui/non, quelles pièces]
-- Temps d'impression total estimé : [À COMPLÉTER]
-- Orientation recommandée : [À COMPLÉTER]
+Le support tient en **une seule pièce** : un plateau ouvert dans lequel
+la carte Waveshare vient se poser et se visser (l'écran, déjà encadré
+par le module, sert lui-même de façade -- pas de capot supplémentaire).
+
+- Imprimante utilisée pour la conception : Bambu Lab X1 Carbon (buse 0,4 mm)
+- Matériau : PLA, une seule couleur
+- Profil : "0,28 mm Extra Draft" (impression rapide)
+- Hauteur de couche : 0,28 mm (première couche 0,2 mm)
+- Parois : 2
+- Remplissage : 5 %
+- Supports : oui (arborescents automatiques)
+- Temps d'impression et poids de filament : dépendent de votre
+  trancheur/imprimante -- non fournis avec le projet 3D
 
 ## Montage
 
-1. [Étape 1 -- ex : insérer la carte Waveshare dans le boîtier avant]
-2. [Étape 2 -- ex : fixer avec les vis fournies]
-3. [Étape 3 -- ex : faire passer le câble USB-C par l'ouverture arrière]
-4. [Étape 4 -- ex : refermer le boîtier / poser le support]
+1. Imprimez le support (voir réglages ci-dessus).
+2. Posez la carte Waveshare dans le support, plots de fixation alignés.
+3. Vissez avec les 2 vis.
+4. Faites passer le câble USB-C par l'ouverture prévue.
 
 ## Installer le firmware (aucune compétence technique requise)
 

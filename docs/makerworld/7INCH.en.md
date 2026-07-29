@@ -1,8 +1,9 @@
 # PlayStation Trophy Display -- trophy display (7" touchscreen)
 
 > Ready-to-paste text for the MakerWorld page description.
-> Sections in `[...]` still need real print info (material, settings,
-> time) -- everything else is verified and accurate.
+> Print settings extracted from the provided Bambu Studio project
+> (`PocketPSN Trophy.3mf`). Exact print time and filament weight depend
+> on your slicer -- not included in the project file (never sliced).
 
 ## Hook
 
@@ -44,25 +45,33 @@ on the screen, over Wi-Fi.
 - A USB-C cable (data-capable, not charge-only)
 - An active [Pocket PSN](https://pocketpsn.com) account (free
   third-party service that provides PlayStation trophy data)
-- [PRINT MATERIAL -- e.g. PLA, X g]
-- [SCREWS / HEAT-SET INSERTS if needed, quantity and size]
+- PLA filament (a single color is enough for this stand)
+- 2 screws (exact size depends on your inserts/tapping -- 2 mounting
+  posts are built into the stand)
 
 ## 3D printing
 
-- Recommended material: [TO FILL IN]
-- Color used in the photos: [TO FILL IN]
-- Layer height: [TO FILL IN]
-- Infill: [TO FILL IN]
-- Supports: [TO FILL IN -- yes/no, which parts]
-- Estimated total print time: [TO FILL IN]
-- Recommended orientation: [TO FILL IN]
+The stand is **a single part**: an open tray the Waveshare board sits
+in and screws down to (the screen module already has its own bezel, so
+there's no separate front cover).
+
+- Printer used for the design: Bambu Lab X1 Carbon (0.4 mm nozzle)
+- Material: PLA, single color
+- Profile: "0.28mm Extra Draft" (fast print)
+- Layer height: 0.28 mm (first layer 0.2 mm)
+- Wall loops: 2
+- Infill: 5%
+- Supports: yes (tree, automatic)
+- Print time and filament weight: depend on your slicer/printer -- not
+  included with the 3D project
 
 ## Assembly
 
-1. [Step 1 -- e.g. insert the Waveshare board into the front housing]
-2. [Step 2 -- e.g. secure with the provided screws]
-3. [Step 3 -- e.g. route the USB-C cable through the rear opening]
-4. [Step 4 -- e.g. close the housing / attach the stand]
+1. Print the stand (see settings above).
+2. Place the Waveshare board into the stand, aligned with the mounting
+   posts.
+3. Secure with the 2 screws.
+4. Route the USB-C cable through the provided opening.
 
 ## Installing the firmware (no technical skills required)
 
