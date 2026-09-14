@@ -12,7 +12,19 @@ namespace {
 // 2026-07-29, apres avoir teste 12s sur le materiel) -- redescendu entre
 // l'original (3s, trop rapide) et 12s (trop lent).
 constexpr uint32_t kSlideMs = 7000;
-constexpr int kSlideCount = 10;
+constexpr uint32_t kStateScreenMs = 7000;
+constexpr int kSlideCount = 8;
+
+// Retour automatique au defilement apres ce delai sans contact. Assez long
+// pour lire un ecran tranquillement sans qu'il file, assez court pour
+// qu'un appareil laisse tel quel apres un appui distrait redevienne seul
+// la vitrine qu'il est censee etre.
+constexpr uint32_t kIdleResumeMs = 20000;
+
+// Un swipe peut produire plusieurs evenements de geste consecutifs, et
+// chaque navigation reconstruit un ecran entier : sans ce garde-fou, un
+// geste un peu appuye saute deux ou trois slides d'un coup.
+constexpr uint32_t kNavDebounceMs = 250;
 
 // Meme mapping que RoundUiBridge (src/ui/RoundUiBridge.cpp, non reutilise
 // directement : prive a cette classe-la, et couplee au framework de pages
@@ -224,18 +236,10 @@ void WideUiBridge::loadSlide(int index) {
       next = trophy::build_statistics_overview_screen_wide(profile_, language_);
       break;
     case 7:
-      next = trophy::build_stat_screen_wide(trophy::StatIconKind::Medal, profile_.world_rank.c_str(),
-                                             tr(language_, Str::kWorldRank), 2, 4);
-      break;
-    case 8:
-      next = trophy::build_stat_screen_wide(trophy::StatIconKind::Clock, profile_.play_time.c_str(),
-                                             tr(language_, Str::kPlayTime), 3, 4);
-      break;
-    case 9:
-      // Mention Pocket PSN (source des donnees) : le board rond a un ecran
-      // "A propos" equivalent mais accessible par tactile -- ce board n'en
-      // a pas, donc integre au defilement automatique. Retour utilisateur
-      // du 2026-07-28 ("zero ref a pocket psn").
+      // Mention Pocket PSN (source des donnees) : maintenue dans le
+      // defilement meme depuis l'ajout du tactile -- la source des donnees
+      // doit se voir sans qu'on ait a la chercher dans un menu. Retour
+      // utilisateur du 2026-07-28 ("zero ref a pocket psn").
       next = trophy::build_credits_screen_wide(language_);
       break;
     default:
@@ -243,6 +247,132 @@ void WideUiBridge::loadSlide(int index) {
   }
   if (next == nullptr) return;
   showScreen(next);
+  attachNavLayer(next);
+}
+
+void WideUiBridge::attachNavLayer(lv_obj_t* screen) {
+  if (screen == nullptr) return;
+  lv_obj_add_event_cb(screen, &WideUiBridge::onScreenGesture, LV_EVENT_GESTURE, this);
+  navOverlay_ = trophy::attach_wide_nav_overlay(screen, slideIndex_, kSlideCount, &WideUiBridge::onNavAction, this);
+  // La couche est reconstruite avec chaque ecran : elle doit repartir dans
+  // l'etat courant, pas dans son etat par defaut.
+  if (navOverlay_ != nullptr && !interactive_) lv_obj_add_flag(navOverlay_, LV_OBJ_FLAG_HIDDEN);
+}
+
+void WideUiBridge::onNavAction(trophy::WideNavAction action, int target, void* owner) {
+  auto* self = static_cast<WideUiBridge*>(owner);
+  if (self == nullptr) return;
+  self->handleNav(action, target);
+}
+
+void WideUiBridge::onScreenGesture(lv_event_t* e) {
+  auto* self = static_cast<WideUiBridge*>(lv_event_get_user_data(e));
+  if (self == nullptr) return;
+  lv_indev_t* indev = lv_indev_active();
+  if (indev == nullptr) return;
+  const lv_dir_t dir = lv_indev_get_gesture_dir(indev);
+  if (dir == LV_DIR_LEFT) {
+    self->handleNav(trophy::WideNavAction::kNext, 0);
+  } else if (dir == LV_DIR_RIGHT) {
+    self->handleNav(trophy::WideNavAction::kPrev, 0);
+  }
+}
+
+void WideUiBridge::handleNav(trophy::WideNavAction action, int target) {
+  // Appele depuis un callback LVGL : on n'y touche pas a l'arbre d'objets,
+  // on note seulement quoi faire (voir navPending_).
+  //
+  // Toujours avant l'anti-rebond : meme un geste ignore prouve que
+  // quelqu'un est devant l'appareil, et doit repousser le retour ambiant.
+  noteTouchActivity();
+  if (nowMillis_ - lastNavMs_ < kNavDebounceMs) return;
+  lastNavMs_ = nowMillis_;
+  navPending_ = true;
+  pendingAction_ = action;
+  pendingTarget_ = target;
+}
+
+void WideUiBridge::applyPendingNav() {
+  if (!navPending_) return;
+  navPending_ = false;
+  const trophy::WideNavAction action = pendingAction_;
+  const int target = pendingTarget_;
+
+  if (showingSettings_) {
+    // Depuis les Reglages, seul le retour a un sens. Le swipe vers la
+    // droite ferme aussi, c'est le geste "retour" attendu par reflexe.
+    if (action == trophy::WideNavAction::kCloseSettings || action == trophy::WideNavAction::kPrev) closeSettings();
+    return;
+  }
+
+  switch (action) {
+    case trophy::WideNavAction::kPrev:
+      slideIndex_ = (slideIndex_ + kSlideCount - 1) % kSlideCount;
+      loadSlide(slideIndex_);
+      break;
+    case trophy::WideNavAction::kNext:
+      slideIndex_ = (slideIndex_ + 1) % kSlideCount;
+      loadSlide(slideIndex_);
+      break;
+    case trophy::WideNavAction::kGoTo:
+      if (target < 0 || target >= kSlideCount || target == slideIndex_) return;
+      slideIndex_ = target;
+      loadSlide(slideIndex_);
+      break;
+    case trophy::WideNavAction::kOpenSettings:
+      openSettings();
+      break;
+    case trophy::WideNavAction::kCloseSettings:
+      break;
+  }
+}
+
+void WideUiBridge::noteTouchActivity() {
+  lastTouchMs_ = nowMillis_;
+  if (!interactive_) setInteractive(true);
+}
+
+void WideUiBridge::pollTouchActivity() {
+  for (lv_indev_t* indev = lv_indev_get_next(nullptr); indev != nullptr; indev = lv_indev_get_next(indev)) {
+    if (lv_indev_get_type(indev) != LV_INDEV_TYPE_POINTER) continue;
+    if (lv_indev_get_state(indev) == LV_INDEV_STATE_PRESSED) {
+      noteTouchActivity();
+      return;
+    }
+  }
+}
+
+void WideUiBridge::setInteractive(bool interactive) {
+  if (interactive_ != interactive) {
+    Logger::info("[UI 7\"] Mode %s (t=%ums, slide=%d)", interactive ? "interactif" : "ambiant",
+                 static_cast<unsigned>(nowMillis_), slideIndex_);
+  }
+  interactive_ = interactive;
+  if (navOverlay_ == nullptr) return;
+  if (interactive) {
+    lv_obj_clear_flag(navOverlay_, LV_OBJ_FLAG_HIDDEN);
+  } else {
+    lv_obj_add_flag(navOverlay_, LV_OBJ_FLAG_HIDDEN);
+  }
+}
+
+void WideUiBridge::openSettings() {
+  if (showingSettings_) return;
+  lv_obj_t* next = trophy::build_settings_screen_wide(profile_, language_);
+  if (next == nullptr) return;
+  showingSettings_ = true;
+  showScreen(next);
+  lv_obj_add_event_cb(next, &WideUiBridge::onScreenGesture, LV_EVENT_GESTURE, this);
+  // Le retour reste visible en permanence sur cet ecran : on y arrive
+  // forcement par un appui, le masquer enfermerait l'utilisateur.
+  navOverlay_ = trophy::attach_wide_back_overlay(next, &WideUiBridge::onNavAction, this, language_);
+}
+
+void WideUiBridge::closeSettings() {
+  if (!showingSettings_) return;
+  showingSettings_ = false;
+  lastSlideMs_ = nowMillis_;
+  loadSlide(slideIndex_);
 }
 
 void WideUiBridge::loadWifiSetupScreen() {
@@ -256,9 +386,30 @@ void WideUiBridge::loadWifiSetupScreen() {
 
 void WideUiBridge::showScreen(lv_obj_t* next) {
   lv_obj_t* previous = currentScreen_;
+  // La couche de navigation est un enfant de l'ecran sortant : elle part
+  // avec lui, il ne reste qu'a oublier le pointeur avant la destruction.
+  navOverlay_ = nullptr;
   lv_scr_load(next);
   currentScreen_ = next;
   if (previous != nullptr) lv_obj_delete(previous);
+}
+
+void WideUiBridge::showStateScreen(lv_obj_t* next, StateScreenKind kind) {
+  if (next == nullptr) return;
+  showingStateScreen_ = true;
+  stateScreenKind_ = kind;
+  lastSlideMs_ = nowMillis_;
+  // Un ecran d'etat (sync/hors ligne/erreur) est modal : il reprend la
+  // main sur la navigation manuelle plutot que de la laisser a moitie
+  // active sur un ecran qui n'a ni points ni fleches.
+  showingSettings_ = false;
+  interactive_ = false;
+  showScreen(next);
+}
+
+void WideUiBridge::clearStateScreen() {
+  showingStateScreen_ = false;
+  stateScreenKind_ = StateScreenKind::kNone;
 }
 
 void WideUiBridge::begin() {
@@ -293,6 +444,38 @@ void WideUiBridge::tick(uint32_t nowMillis) {
     return;
   }
   if (showingSetup_) return;  // defilement en pause tant que la config est requise
+  if (showingStateScreen_) {
+    const bool canAutoDismiss =
+        stateScreenKind_ == StateScreenKind::kSync || stateScreenKind_ == StateScreenKind::kError ||
+        stateScreenKind_ == StateScreenKind::kOffline;
+    if (canAutoDismiss && nowMillis - lastSlideMs_ >= kStateScreenMs) {
+      if (stateScreenKind_ == StateScreenKind::kSync) {
+        syncStateDismissed_ = true;
+        dismissedSyncState_ = lastRawSyncState_;
+      }
+      clearStateScreen();
+      lastSlideMs_ = nowMillis;
+      loadSlide(slideIndex_);
+    }
+    return;
+  }
+
+  // A partir d'ici on est sur un ecran du defilement : c'est le seul
+  // contexte ou le tactile de navigation a un sens.
+  pollTouchActivity();
+  // LVGL est au repos a cet instant : c'est le seul endroit sur pour
+  // detruire et reconstruire un ecran.
+  applyPendingNav();
+
+  if (interactive_) {
+    if (nowMillis - lastTouchMs_ < kIdleResumeMs) return;  // quelqu'un a la main
+    // Plus de contact depuis un moment : on referme la navigation et
+    // l'appareil redevient la vitrine autonome qu'il doit etre par defaut.
+    if (showingSettings_) closeSettings();
+    setInteractive(false);
+    lastSlideMs_ = nowMillis;
+    return;
+  }
 
   if (nowMillis - lastSlideMs_ >= kSlideMs) {
     lastSlideMs_ = nowMillis;

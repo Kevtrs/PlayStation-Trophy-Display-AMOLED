@@ -13,8 +13,24 @@
 // screens_wide.hpp) : meme role que RoundUiBridge pour l'ecran rond, mais
 // sans le framework de pages "App"/ui_model (screens_wide.cpp prend des
 // donnees pures) -- fait donc defiler lui-meme, automatiquement, Dashboard
-// -> 4 trophees -> 4 statistiques -> Dashboard... (aucun tactile requis,
-// voir la decision de design du 2026-07-28).
+// -> 4 trophees -> 4 statistiques -> Dashboard...
+//
+// Deux modes, volontairement dans cet ordre de priorite :
+//
+//  - AMBIANT (defaut) : le defilement tourne seul, aucun controle affiche.
+//    L'appareil est un objet pose sur un bureau, il doit etre lisible et
+//    complet sans qu'on y touche -- c'est l'etat dans lequel il passe la
+//    quasi-totalite de son temps.
+//  - INTERACTIF : declenche par n'importe quel appui (le GT911 est
+//    enregistre dans LVGL, voir main_7inch.cpp). Met le defilement en
+//    pause, affiche la couche de navigation (fleches, points cliquables,
+//    engrenage). Revient tout seul en ambiant apres kIdleResumeMs sans
+//    contact, pour qu'un appareil laisse tel quel ne reste jamais bloque
+//    sur un ecran.
+//
+// Le tactile n'est donc jamais indispensable : il ouvre des raccourcis
+// (aller directement a un ecran, atteindre les Reglages) sans qu'aucune
+// information ne devienne inaccessible a qui ne touche rien.
 //
 // Aucune page Boot/Sync/Erreur dediee pour l'instant (voir Key Technical
 // Concepts, seuls Dashboard/Trophees/Statistiques sont dessines cote large)
@@ -45,6 +61,33 @@ class WideUiBridge : public UiBridge {
   std::string formatUpdated(AppLanguage lang) const;
   void loadSlide(int index);
   void loadWifiSetupScreen();
+
+  // --- Tactile ---------------------------------------------------------
+  // Point d'entree unique des controles de la couche de navigation
+  // (trampoline C -> membre, LVGL ne connait que des fonctions libres).
+  static void onNavAction(trophy::WideNavAction action, int target, void* owner);
+  static void onScreenGesture(lv_event_t* e);
+  void handleNav(trophy::WideNavAction action, int target);
+  // Applique l'action en attente, depuis tick() uniquement.
+  void applyPendingNav();
+  // Enregistre un contact et bascule en mode interactif si besoin.
+  void noteTouchActivity();
+  // Lit l'etat du pointeur LVGL a chaque tick : un appui sur une carte est
+  // absorbe par cette carte et ne remonte pas jusqu'a l'ecran, donc un
+  // callback pose sur la racine raterait la moitie des appuis.
+  void pollTouchActivity();
+  void setInteractive(bool interactive);
+  void attachNavLayer(lv_obj_t* screen);
+  void openSettings();
+  void closeSettings();
+  enum class StateScreenKind : uint8_t {
+    kNone,
+    kSync,
+    kOffline,
+    kError,
+  };
+  void showStateScreen(lv_obj_t* next, StateScreenKind kind);
+  void clearStateScreen();
   void showScreen(lv_obj_t* next);
 
   trophy::ProfileData profile_;
@@ -55,6 +98,24 @@ class WideUiBridge : public UiBridge {
   uint32_t lastSlideMs_ = 0;
   lv_obj_t* currentScreen_ = nullptr;
   bool began_ = false;
+
+  // Mode interactif : defilement en pause, couche de navigation visible.
+  bool interactive_ = false;
+  uint32_t lastTouchMs_ = 0;
+  uint32_t lastNavMs_ = 0;
+  bool showingSettings_ = false;
+  // Appartient a currentScreen_ : remis a nullptr des que cet ecran est
+  // detruit (voir showScreen()), jamais libere separement.
+  lv_obj_t* navOverlay_ = nullptr;
+
+  // Action tactile en attente. Un callback LVGL (bouton ou geste)
+  // s'execute DANS l'arbre de l'ecran courant : s'il declenchait lui-meme
+  // le changement d'ecran, il detruirait l'objet en train de distribuer
+  // l'evenement. Les callbacks se contentent donc d'enregistrer
+  // l'intention, et tick() la realise une fois LVGL au repos.
+  bool navPending_ = false;
+  trophy::WideNavAction pendingAction_ = trophy::WideNavAction::kNext;
+  int pendingTarget_ = 0;
 
   // Tant qu'aucun Wi-Fi/compte n'est configure (WifiState::kAccessPoint,
   // voir AppController::tick()), l'ecran de connexion (build_wifi_setup_

@@ -27,20 +27,53 @@ lv_obj_t *build_stat_screen_wide(StatIconKind icon_kind, const char *value, cons
 
 // Ecran de credits (logo + mention Pocket PSN, source des donnees de
 // trophees) : le board rond a un ecran "A propos" equivalent (voir
-// build_about_screen() dans screens.cpp) mais accessible par tactile
-// (Reglages -> A propos) -- ce board n'a pas de tactile, donc aucune
-// mention Pocket PSN n'apparaissait nulle part avant son ajout ici, dans
-// le defilement automatique. Retour utilisateur du 2026-07-28.
+// build_about_screen() dans screens.cpp). Garde dans le defilement
+// automatique meme depuis l'ajout du tactile : la mention de la source des
+// donnees doit rester visible sans qu'on ait a la chercher.
+// Retour utilisateur du 2026-07-28.
 lv_obj_t *build_credits_screen_wide(AppLanguage lang);
 
+// --- Couche de navigation tactile (board 7", GT911) -------------------
+//
+// Le defilement automatique reste le mode par defaut : l'appareil est un
+// objet pose sur un bureau, il doit etre lisible sans qu'on le touche. Le
+// tactile ne remplace pas ce defilement, il le met en pause et donne la
+// main -- voir WideUiBridge pour la machine a etats.
+enum class WideNavAction : uint8_t {
+    kPrev,
+    kNext,
+    kGoTo,           // "target" porte l'index de destination
+    kOpenSettings,
+    kCloseSettings,
+};
+
+// Pointeur de fonction libre plutot que std::function : pas d'allocation
+// dynamique cachee dans le chemin d'interaction sur ESP32-S3.
+using WideNavHandler = void (*)(WideNavAction action, int target, void *owner);
+
+// Pose la couche de navigation par-dessus un ecran du defilement et
+// renvoie sa racine, a masquer/afficher avec LV_OBJ_FLAG_HIDDEN (masquee,
+// elle ne recoit plus aucun evenement : le mode ambiant est donc inerte au
+// toucher sans code supplementaire). Renvoie nullptr si screen == nullptr.
+//
+// A appeler APRES avoir dessine le contenu de l'ecran : LVGL empile dans
+// l'ordre de creation, la couche doit rester au-dessus.
+lv_obj_t *attach_wide_nav_overlay(lv_obj_t *screen, int index, int count, WideNavHandler handler, void *owner);
+
+// Bouton de retour pose sur l'ecran Reglages (icone + libelle traduit :
+// un pictogramme seul n'est pas evident pour quelqu'un qui decouvre
+// l'objet sans notice).
+lv_obj_t *attach_wide_back_overlay(lv_obj_t *screen, WideNavHandler handler, void *owner, AppLanguage lang);
+
 // Ecran affiche tant que le board n'a ni Wi-Fi ni compte Pocket PSN
-// configures (WifiState::kAccessPoint, voir AppController::tick()) : ce
-// board n'a pas de tactile (voir commentaire d'en-tete de
-// WideUiBridge.h), donc sans cet ecran un utilisateur non-technique qui
-// flashe l'appareil n'a AUCUN moyen de savoir qu'une configuration est
-// possible -- il ne verrait que des trophees de demonstration qui donnent
-// l'impression que "ca marche deja". Remplace entierement le defilement
-// normal tant que ce n'est pas configure (voir WideUiBridge::tick()).
+// configures (WifiState::kAccessPoint, voir AppController::tick()) : sans
+// cet ecran, un utilisateur non-technique qui flashe l'appareil n'a AUCUN
+// moyen de savoir qu'une configuration est possible -- il ne verrait que
+// des trophees de demonstration qui donnent l'impression que "ca marche
+// deja". Remplace entierement le defilement normal tant que ce n'est pas
+// configure, et ne recoit volontairement aucune couche de navigation : il
+// n'y a rien d'autre a consulter tant que l'appareil n'est pas configure
+// (voir WideUiBridge::tick()).
 // Retour utilisateur du 2026-07-29 ("ta tout prevu... l'ecran de
 // connexion... tout ?").
 lv_obj_t *build_wifi_setup_screen_wide(const std::string &ssid, const std::string &ip_address, AppLanguage lang);

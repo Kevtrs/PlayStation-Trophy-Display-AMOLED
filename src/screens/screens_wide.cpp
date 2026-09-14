@@ -1425,4 +1425,202 @@ lv_obj_t *build_stat_screen_wide_v3(StatIconKind icon_kind, const char *value, c
     return root;
 }
 
+// --- Couche de navigation tactile -------------------------------------
+
+namespace {
+
+// 44 px : plus petite cible tactile confortable a viser au doigt sans
+// viser precisement (recommandation WCAG 2.5.5 / Apple HIG, retenue ici
+// parce que l'appareil s'utilise debout, a bout de bras, pas de pres).
+constexpr int kWideNavTouchSize = 44;
+constexpr int kWideNavButtonSize = 56;
+constexpr int kWideNavMargin = 10;
+
+struct WideNavTouchContext {
+    WideNavAction action;
+    int target;
+    WideNavHandler handler;
+    void *owner;
+};
+
+void wide_nav_touch_event(lv_event_t *e) {
+    auto *ctx = static_cast<WideNavTouchContext *>(lv_event_get_user_data(e));
+    if(ctx == nullptr) return;
+    const lv_event_code_t code = lv_event_get_code(e);
+    if(code == LV_EVENT_DELETE) {
+        delete ctx;
+        return;
+    }
+    if(code == LV_EVENT_CLICKED && ctx->handler != nullptr) {
+        ctx->handler(ctx->action, ctx->target, ctx->owner);
+    }
+}
+
+// Rend un sous-arbre transparent au toucher : sans ca, le glyphe dessine
+// au centre d'un bouton capte le clic a la place du bouton (lv_obj_create
+// et lv_line_create sont CLICKABLE par defaut), et taper pile au milieu
+// d'une fleche ne fait rien.
+void wide_nav_passthrough(lv_obj_t *obj) {
+    if(obj == nullptr) return;
+    lv_obj_clear_flag(obj, LV_OBJ_FLAG_CLICKABLE);
+    const uint32_t count = lv_obj_get_child_count(obj);
+    for(uint32_t i = 0; i < count; ++i) wide_nav_passthrough(lv_obj_get_child(obj, i));
+}
+
+void wide_nav_set_gesture_bubble(lv_obj_t *obj) {
+    if(obj == nullptr) return;
+    lv_obj_add_flag(obj, LV_OBJ_FLAG_GESTURE_BUBBLE);
+    const uint32_t count = lv_obj_get_child_count(obj);
+    for(uint32_t i = 0; i < count; ++i) wide_nav_set_gesture_bubble(lv_obj_get_child(obj, i));
+}
+
+// Prepare l'arbre pour que LVGL livre LV_EVENT_GESTURE a l'ecran.
+//
+// Attention au sens exact du drapeau (lv_indev.c, indev_gesture) : LVGL
+// part de l'objet sous le doigt et remonte TANT QUE l'objet porte
+// LV_OBJ_FLAG_GESTURE_BUBBLE ; l'evenement va au premier objet qui ne le
+// porte PAS. Il faut donc l'inverse de l'intuition :
+//   - tous les descendants le portent, sinon un geste parti d'une carte
+//     s'arrete sur cette carte ;
+//   - l'ecran ne le porte surtout PAS, sinon la remontee le depasse,
+//     atteint nullptr, et l'evenement n'est envoye a personne.
+void wide_nav_enable_gesture_bubbling(lv_obj_t *screen) {
+    if(screen == nullptr) return;
+    const uint32_t count = lv_obj_get_child_count(screen);
+    for(uint32_t i = 0; i < count; ++i) wide_nav_set_gesture_bubble(lv_obj_get_child(screen, i));
+    lv_obj_clear_flag(screen, LV_OBJ_FLAG_GESTURE_BUBBLE);
+}
+
+lv_obj_t *wide_nav_overlay_root(lv_obj_t *screen) {
+    lv_obj_t *overlay = lv_obj_create(screen);
+    lv_obj_remove_style_all(overlay);
+    lv_obj_clear_flag(overlay, LV_OBJ_FLAG_SCROLLABLE);
+    // La couche ne capte rien elle-meme : seuls ses boutons sont
+    // cliquables, les gestes continuent d'atteindre l'ecran en dessous.
+    lv_obj_clear_flag(overlay, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_size(overlay, WIDE_WIDTH, WIDE_HEIGHT);
+    lv_obj_set_pos(overlay, 0, 0);
+    lv_obj_set_style_bg_opa(overlay, LV_OPA_TRANSP, 0);
+    return overlay;
+}
+
+lv_obj_t *wide_nav_button(lv_obj_t *parent, int x, int y, const char *icon, int glyph, WideNavAction action,
+                          WideNavHandler handler, void *owner) {
+    lv_obj_t *btn = lv_obj_create(parent);
+    lv_obj_remove_style_all(btn);
+    lv_obj_clear_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(btn, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_size(btn, kWideNavButtonSize, kWideNavButtonSize);
+    lv_obj_set_pos(btn, x, y);
+    lv_obj_set_style_radius(btn, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(btn, colors.surface_primary, 0);
+    lv_obj_set_style_bg_opa(btn, wide_opa_pct(78), 0);
+    lv_obj_set_style_border_color(btn, colors.accent_cyan, 0);
+    lv_obj_set_style_border_opa(btn, wide_opa_pct(45), 0);
+    lv_obj_set_style_border_width(btn, 1, 0);
+    // Retour visuel immediat a l'appui, gere par les etats LVGL plutot que
+    // par un callback : rien a remettre a zero en cas de PRESS_LOST.
+    lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_STATE_PRESSED);
+    lv_obj_set_style_border_opa(btn, LV_OPA_COVER, LV_STATE_PRESSED);
+
+    lv_obj_t *box = make_icon_box(btn, icon, glyph, glyph, colors.text_primary);
+    lv_obj_center(box);
+    wide_nav_passthrough(box);
+
+    auto *ctx = new WideNavTouchContext{action, 0, handler, owner};
+    lv_obj_add_event_cb(btn, wide_nav_touch_event, LV_EVENT_ALL, ctx);
+    return btn;
+}
+
+void wide_nav_dot(lv_obj_t *parent, int x, int y, bool active, int index, WideNavHandler handler, void *owner) {
+    // Point discret (8/12 px) mais cible tactile pleine taille : le
+    // reperage visuel n'a pas a dicter la difficulte de visee.
+    lv_obj_t *hit = lv_obj_create(parent);
+    lv_obj_remove_style_all(hit);
+    lv_obj_clear_flag(hit, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(hit, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_size(hit, kWideNavTouchSize, kWideNavTouchSize);
+    lv_obj_set_pos(hit, x, y);
+    lv_obj_set_style_bg_opa(hit, LV_OPA_TRANSP, 0);
+
+    lv_obj_t *dot = lv_obj_create(hit);
+    lv_obj_remove_style_all(dot);
+    lv_obj_clear_flag(dot, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_size(dot, active ? 12 : 8, active ? 12 : 8);
+    lv_obj_center(dot);
+    lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(dot, active ? colors.accent_cyan : colors.text_secondary, 0);
+    lv_obj_set_style_bg_opa(dot, active ? LV_OPA_COVER : wide_opa_pct(55), 0);
+
+    auto *ctx = new WideNavTouchContext{WideNavAction::kGoTo, index, handler, owner};
+    lv_obj_add_event_cb(hit, wide_nav_touch_event, LV_EVENT_ALL, ctx);
+}
+
+} // namespace
+
+lv_obj_t *attach_wide_nav_overlay(lv_obj_t *screen, int index, int count, WideNavHandler handler, void *owner) {
+    if(screen == nullptr || count <= 0) return nullptr;
+
+    lv_obj_t *overlay = wide_nav_overlay_root(screen);
+
+    const int dots_y = WIDE_HEIGHT - kWideNavTouchSize - 6;
+    const int dots_x = (WIDE_WIDTH - count * kWideNavTouchSize) / 2;
+
+    // Fond en pilule derriere la rangee de points, pour deux raisons :
+    // les ecrans trophee/statistiques dessinent deja leur propre
+    // indicateur de page a WIDE_HERO_DOTS_Y (442), soit exactement dans
+    // cette bande -- sans ce fond, les deux paginations se superposent ;
+    // et les controles restent lisibles quel que soit le contenu dessous.
+    lv_obj_t *tray = lv_obj_create(overlay);
+    lv_obj_remove_style_all(tray);
+    lv_obj_clear_flag(tray, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(tray, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_size(tray, count * kWideNavTouchSize + 20, kWideNavTouchSize + 4);
+    lv_obj_set_pos(tray, dots_x - 10, dots_y - 2);
+    lv_obj_set_style_radius(tray, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(tray, colors.background_primary, 0);
+    // Opaque, pas 92% : l'indicateur natif dessous est cyan vif, le moindre
+    // reste de transparence le laissait percer en filet sous la rangee.
+    lv_obj_set_style_bg_opa(tray, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(tray, colors.accent_cyan, 0);
+    lv_obj_set_style_border_opa(tray, wide_opa_pct(30), 0);
+    lv_obj_set_style_border_width(tray, 1, 0);
+
+    for(int i = 0; i < count; ++i) {
+        wide_nav_dot(overlay, dots_x + i * kWideNavTouchSize, dots_y, i == index, i, handler, owner);
+    }
+
+    const int arrow_y = (WIDE_HEIGHT - kWideNavButtonSize) / 2;
+    wide_nav_button(overlay, kWideNavMargin, arrow_y, "chevron-left", 26, WideNavAction::kPrev, handler, owner);
+    wide_nav_button(overlay, WIDE_WIDTH - kWideNavButtonSize - kWideNavMargin, arrow_y, "chevron-right", 26,
+                    WideNavAction::kNext, handler, owner);
+    // Engrenage en bas a gauche : la bande de points occupe le centre bas,
+    // les fleches le milieu des bords -- aucun chevauchement.
+    wide_nav_button(overlay, kWideNavMargin, WIDE_HEIGHT - kWideNavButtonSize - kWideNavMargin, "settings", 24,
+                    WideNavAction::kOpenSettings, handler, owner);
+    // En dernier : l'arbre doit etre complet, couche de navigation
+    // comprise, pour qu'un geste parti de n'importe ou remonte a l'ecran.
+    wide_nav_enable_gesture_bubbling(screen);
+    return overlay;
+}
+
+lv_obj_t *attach_wide_back_overlay(lv_obj_t *screen, WideNavHandler handler, void *owner, AppLanguage lang) {
+    if(screen == nullptr) return nullptr;
+
+    lv_obj_t *overlay = wide_nav_overlay_root(screen);
+    // En haut a gauche, la ou l'oeil cherche un retour. Les lignes de
+    // reglages occupent x=77..723 sur toute la hauteur utile : la colonne
+    // de gauche est le seul endroit ou poser ce controle sans recouvrir
+    // quoi que ce soit (la derniere ligne descend jusqu'a y=444, il ne
+    // reste rien d'exploitable en bas).
+    const int y = 64;
+    wide_nav_button(overlay, kWideNavMargin, y, "arrow-left", 26, WideNavAction::kCloseSettings, handler, owner);
+    // Libelle sous l'icone : une fleche seule se comprend, mais le mot
+    // leve tout doute pour quelqu'un qui decouvre l'appareil sans notice.
+    label(overlay, tr(lang, Str::kBackButton), &td_font_12, colors.text_secondary, 2,
+          y + kWideNavButtonSize + 4, 72, LV_TEXT_ALIGN_CENTER);
+    wide_nav_enable_gesture_bubbling(screen);
+    return overlay;
+}
+
 } // namespace trophy
