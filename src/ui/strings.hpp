@@ -189,9 +189,9 @@ enum class Str {
     kFixtureErrorStateTitle,
     kFixtureErrorStateMessage,
 
-    // screens_wide.cpp : build_wifi_setup_screen_wide() (board 7", pas de
-    // tactile -- voir WideUiBridge.h).
+    // screens_wide.cpp : build_wifi_setup_screen_wide() (board 7").
     kWifiSetupTitle,
+    kWifiSetupScan, // invite de scan du QR d'appairage Wi-Fi
     kWifiSetupInstruction,
     kWifiSetupFallbackFormat, // printf-style, %s = adresse IP (voir kProgressToNextFormat)
 

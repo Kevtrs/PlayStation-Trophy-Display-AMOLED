@@ -182,6 +182,8 @@ constexpr Entry kEntries[] = {
                                             "Check the PSN username, then retry the test from settings."},
 
     /* kWifiSetupTitle */                 {"Configuration requise", "Setup required"},
+    /* kWifiSetupScan */                  {"Scannez ce code avec votre téléphone",
+                                            "Scan this code with your phone"},
     /* kWifiSetupInstruction */           {"Une page de configuration s'ouvrira automatiquement",
                                             "A setup page will open automatically"},
     /* kWifiSetupFallbackFormat */        {"Sinon, ouvrez %s dans votre navigateur",

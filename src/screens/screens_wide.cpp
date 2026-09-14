@@ -1143,9 +1143,44 @@ lv_obj_t *build_wifi_setup_screen_wide(const std::string &ssid, const std::strin
     add_slider_deco(root, wide_center_x(kRingSize) - 40, kRingY - 13, colors.accent_violet);
     add_slider_deco(root, wide_center_x(kRingSize) + kRingSize + 24, kRingY - 13, colors.accent_cyan);
 
-    constexpr int kIconGlyph = 96;
-    lv_obj_t *icon = make_icon_box(root, "wifi", kIconGlyph, kIconGlyph - 20, colors.text_primary);
-    lv_obj_set_pos(icon, wide_center_x(kIconGlyph), kRingY - kIconGlyph / 2);
+    // QR d'appairage, a la place de l'ancienne icone Wi-Fi : les anneaux
+    // lui servent de cadre, la composition ne bouge pas.
+    //
+    // Format "WIFI:" reconnu nativement par l'appareil photo d'Android et
+    // d'iOS : scanner rejoint le reseau, puis le portail captif s'ouvre
+    // seul. L'utilisateur n'a plus ni SSID ni adresse IP a recopier, ce
+    // qui etait la marche exacte que ratait quelqu'un de non technique.
+    // Le point d'acces est ouvert (WiFiManager.cpp appelle softAP() sans
+    // mot de passe), d'ou "T:nopass".
+    char wifi_payload[128];
+    std::snprintf(wifi_payload, sizeof(wifi_payload), "WIFI:T:nopass;S:%s;;", ssid.c_str());
+
+    // Fond blanc et modules noirs, avec une marge blanche autour : un QR
+    // clair sur fond sombre ou colle au decor devient difficile a lire
+    // pour beaucoup de lecteurs. C'est le seul element volontairement non
+    // AMOLED de l'interface, et il n'apparait que tant que l'appareil
+    // n'est pas configure.
+    // La carte (192) est volontairement bien plus grande que le code
+    // (164) : c'est la marge blanche qui compte, pas la taille demandee.
+    //
+    // Mesure, en decodant les captures rendues : passer de 176/148 a
+    // 192/164 n'a PAS agrandi le code (143 -> 144 px -- lv_qrcode_set_size
+    // arrondit a un multiple entier de modules, la valeur demandee n'est
+    // qu'un plafond). Seule la marge a grandi, de ~16 a ~24 px par cote,
+    // et le seuil de lecture est passe de 72 px a 58 px de resolution de
+    // capture. Ne pas rogner cette marge pour gagner de la place.
+    constexpr int kQrCard = 192;
+    constexpr int kQrSize = 164;
+    lv_obj_t *qr_card = card(root, wide_center_x(kQrCard), kRingY - kQrCard / 2, kQrCard, kQrCard, 14, LV_OPA_COVER);
+    lv_obj_set_style_bg_color(qr_card, lv_color_white(), 0);
+    lv_obj_set_style_border_width(qr_card, 0, 0);
+
+    lv_obj_t *qr = lv_qrcode_create(qr_card);
+    lv_qrcode_set_size(qr, kQrSize);
+    lv_qrcode_set_dark_color(qr, lv_color_black());
+    lv_qrcode_set_light_color(qr, lv_color_white());
+    lv_qrcode_update(qr, wifi_payload, static_cast<uint32_t>(std::strlen(wifi_payload)));
+    lv_obj_center(qr);
 
     // Capsule SSID : meme style de carte que le reste de l'app (voir card(),
     // deja utilise pour l'avatar/les mini-cartes du dashboard) -- largeur au
@@ -1160,8 +1195,12 @@ lv_obj_t *build_wifi_setup_screen_wide(const std::string &ssid, const std::strin
     lv_obj_t *ssid_lbl = label(pill, ssid.c_str(), &td_font_28, colors.text_primary, 0, (kPillH - 31) / 2, kPillW,
                                 LV_TEXT_ALIGN_CENTER);
 
-    lv_obj_t *step_lbl = label(root, tr(lang, Str::kWifiSetupInstruction), &td_font_22, colors.text_secondary,
-                                wide_center_x(WIDE_HERO_VALUE_W), kPillY + kPillH + 30, WIDE_HERO_VALUE_W);
+    // Trois niveaux, du geste a faire au recours : scanner, ce qui se
+    // passe ensuite, et quoi faire si le scan echoue.
+    label(root, tr(lang, Str::kWifiSetupScan), &td_font_22, colors.text_primary,
+          wide_center_x(WIDE_HERO_VALUE_W), kPillY + kPillH + 22, WIDE_HERO_VALUE_W);
+    lv_obj_t *step_lbl = label(root, tr(lang, Str::kWifiSetupInstruction), &td_font_14, colors.text_secondary,
+                                wide_center_x(WIDE_HERO_VALUE_W), kPillY + kPillH + 54, WIDE_HERO_VALUE_W);
     char fallback[96];
     std::snprintf(fallback, sizeof(fallback), tr(lang, Str::kWifiSetupFallbackFormat), ip_address.c_str());
     lv_obj_t *fallback_lbl = label(root, fallback, &td_font_14, colors.text_muted, wide_center_x(WIDE_HERO_VALUE_W),
