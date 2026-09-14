@@ -14,7 +14,14 @@ namespace trophy {
 // testables isolement dans le mini-simulateur de prevue tant que le
 // materiel n'est pas en main -- voir simulator_wide/.
 lv_obj_t *build_dashboard_screen_wide(const ProfileData &p, AppLanguage lang);
-lv_obj_t *build_trophy_screen_wide(TrophyKind kind, int value, int sub_index, int sub_count, AppLanguage lang);
+lv_obj_t *build_trophies_overview_screen_wide(const ProfileData &p, AppLanguage lang);
+lv_obj_t *build_trophy_screen_wide(TrophyKind kind, int value, int total, int sub_index, int sub_count,
+                                    AppLanguage lang);
+lv_obj_t *build_statistics_overview_screen_wide(const ProfileData &p, AppLanguage lang);
+lv_obj_t *build_sync_screen_wide(SyncState state, int progress, AppLanguage lang);
+lv_obj_t *build_offline_screen_wide(const ProfileData &p, AppLanguage lang);
+lv_obj_t *build_error_screen_wide(const ProfileData &p, AppLanguage lang);
+lv_obj_t *build_settings_screen_wide(const ProfileData &p, AppLanguage lang);
 lv_obj_t *build_stat_screen_wide(StatIconKind icon_kind, const char *value, const char *caption, int sub_index,
                                   int sub_count);
 

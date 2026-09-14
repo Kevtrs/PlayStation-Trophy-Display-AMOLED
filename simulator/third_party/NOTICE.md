@@ -1,16 +1,14 @@
 # Bibliotheques tierces vendorisees (simulateur uniquement)
 
-## lvgl/ (LVGL 9.4.0)
+## lvgl-9.5.0/ (LVGL 9.5.0)
 
-Source : https://github.com/lvgl/lvgl (tag `v9.4.0`), licence MIT. Migre
-depuis 8.3.11 le 2026-07-22 (voir HANDOFF_PROGRESS.md, branche
-integration/final-lvgl-ui) pour adopter le design final, ecrit
-nativement pour LVGL 9. Copie identique a celle utilisee par le firmware
-ESP32 (`platformio.ini` epingle la meme version `9.4.0`). Dossiers `demos/`,
-`docs/`, `env_support/`, `examples/`, `configs/` retires (non utilises ici,
-uniquement pour reduire la taille du depot) -- seuls `src/` et les fichiers
-racine necessaires a la compilation (`lvgl.h`, `lvgl_private.h`,
-`lv_version.h`, etc.) sont conserves.
+Source : https://github.com/lvgl/lvgl (tag `v9.5.0`, commit `85aa60d`),
+licence MIT. Le simulateur CMake pointe explicitement vers ce dossier pour
+garantir que la preview UI compile et s'execute avec LVGL 9.5.0.
+
+L'ancien dossier `lvgl/` (9.4.0) est conserve temporairement comme reference
+locale afin de faciliter une comparaison ou un retour arriere pendant la phase
+de validation.
 
 ## stb/stb_image_write.h
 

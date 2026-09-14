@@ -83,6 +83,7 @@ static bool outside_safe_corner(const lv_area_t &area) {
 
 static bool same_profile(const ProfileData &a, const ProfileData &b) {
     return a.username == b.username &&
+           a.avatar_file_name == b.avatar_file_name &&
            a.level == b.level &&
            a.progress == b.progress &&
            a.total == b.total &&
@@ -556,6 +557,7 @@ void App::tick_showroom(uint32_t now_ms) {
 void App::apply_showroom_step(int step, bool animate) {
     ProfileData p;
     p.username = "Kevin_Trophies";
+    p.avatar_file_name = "A2117_l.png";
     p.level = 327;
     p.progress = 72;
     p.total = 4286;

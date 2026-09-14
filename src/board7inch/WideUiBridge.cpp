@@ -33,11 +33,65 @@ trophy::SyncState mapSyncState(SyncState state) {
   return trophy::SyncState::Idle;
 }
 
+int syncProgressFor(SyncState state) {
+  switch (state) {
+    case SyncState::kWaitingForNetwork:
+    case SyncState::kConnecting:
+      return 24;
+    case SyncState::kDownloading:
+      return 64;
+    case SyncState::kParsing:
+    case SyncState::kSaving:
+      return 82;
+    case SyncState::kSuccess:
+      return 100;
+    case SyncState::kError:
+      return 100;
+    case SyncState::kIdle:
+    case SyncState::kOffline:
+      return 0;
+  }
+  return 0;
+}
+
 }  // namespace
 
-void WideUiBridge::showSyncState(SyncState /*state*/) {
-  // Pas d'ecran Sync dedie cote large (voir header) : l'etat de sync est
-  // deja repercute sur le badge du Dashboard via mapProfile()/p.sync.
+void WideUiBridge::showSyncState(SyncState state) {
+  profile_.sync = mapSyncState(state);
+  if (!began_ || showingSetup_) {
+    lastRawSyncState_ = state;
+    return;
+  }
+
+  if (isSyncActive(state)) {
+    if (syncStateDismissed_ && state == dismissedSyncState_) return;
+    if (state == lastRawSyncState_ && showingStateScreen_ && stateScreenKind_ == StateScreenKind::kSync) return;
+    lastRawSyncState_ = state;
+    showStateScreen(trophy::build_sync_screen_wide(profile_.sync, syncProgressFor(state), language_),
+                    StateScreenKind::kSync);
+    return;
+  }
+
+  syncStateDismissed_ = false;
+  dismissedSyncState_ = SyncState::kIdle;
+  if (state == lastRawSyncState_ && showingStateScreen_) return;
+  lastRawSyncState_ = state;
+
+  if (state == SyncState::kOffline) {
+    showStateScreen(trophy::build_offline_screen_wide(profile_, language_), StateScreenKind::kOffline);
+    return;
+  }
+  if (state == SyncState::kSuccess && showingStateScreen_) {
+    showStateScreen(trophy::build_sync_screen_wide(trophy::SyncState::Done, 100, language_), StateScreenKind::kSync);
+    clearStateScreen();
+    lastSlideMs_ = nowMillis_;
+    return;
+  }
+  if (state == SyncState::kIdle && showingStateScreen_) {
+    clearStateScreen();
+    lastSlideMs_ = nowMillis_;
+    loadSlide(slideIndex_);
+  }
 }
 
 void WideUiBridge::showTrophyDelta(const TrophyDelta& /*delta*/) {
@@ -46,7 +100,17 @@ void WideUiBridge::showTrophyDelta(const TrophyDelta& /*delta*/) {
 
 void WideUiBridge::showError(const AppError& error) {
   if (error.hasError()) {
+    if (error.code == lastErrorCode_ && error.message == lastErrorMessage_) return;
+    lastErrorCode_ = error.code;
+    lastErrorMessage_ = error.message;
     Logger::error("[UI 7\"] Erreur applicative (code=%d): %s", error.code, error.message.c_str());
+    trophy::ProfileData errorProfile = profile_;
+    errorProfile.error_title = language_ == AppLanguage::kFrench ? "Profil indisponible" : "Profile unavailable";
+    errorProfile.error_message = error.message.empty()
+                                     ? (language_ == AppLanguage::kFrench ? "Synchronisation interrompue."
+                                                                          : "Sync interrupted.")
+                                     : error.message;
+    showStateScreen(trophy::build_error_screen_wide(errorProfile, language_), StateScreenKind::kError);
   }
 }
 
@@ -89,8 +153,11 @@ std::string WideUiBridge::formatUpdated(AppLanguage lang) const {
 trophy::ProfileData WideUiBridge::mapProfile(const AppState& state) const {
   trophy::ProfileData p;
   p.username = state.profile.username.empty() ? "-" : state.profile.username;
+  p.avatar_file_name = state.profile.avatarFileName;
+  p.country = state.profile.country;
   p.level = state.profile.level;
   p.progress = state.profile.levelProgressPercent;
+  p.level_remaining_points = state.profile.levelRemainingPoints;
   p.total = state.stats.totalTrophies;
   p.platinum = state.stats.platinum;
   p.gold = state.stats.gold;
@@ -100,12 +167,17 @@ trophy::ProfileData WideUiBridge::mapProfile(const AppState& state) const {
   p.completion = static_cast<int>(state.stats.completionRatePercent + 0.5f);
   p.world_rank =
       state.stats.worldRank > 0 ? ("#" + trophy::format_number(state.stats.worldRank)) : "-";
+  p.national_rank = state.stats.nationalRank > 0 ? trophy::format_number(state.stats.nationalRank) : "-";
+  p.trophy_points = state.stats.trophyPoints > 0 ? trophy::format_number(state.stats.trophyPoints) : "-";
   p.play_time = state.stats.playtimeHours > 0.0f
                     ? (trophy::format_number(static_cast<int>(state.stats.playtimeHours + 0.5f)) + " h")
                     : "-";
   p.updated = formatUpdated(state.settings.language);
   p.offline = state.sync.isOffline;
   p.sync = mapSyncState(state.sync.state);
+  p.has_ps_plus = state.profile.hasPsPlus;
+  p.brightness = state.settings.brightnessPercent;
+  p.reduced_motion = !state.settings.animationsEnabled;
   return p;
 }
 
@@ -115,6 +187,13 @@ void WideUiBridge::setAppState(const AppState& state) {
     lastSyncMillis_ = nowMillis_;
     everSynced_ = true;
   }
+  if (!state.sync.lastError.hasError()) {
+    lastErrorCode_ = 0;
+    lastErrorMessage_.clear();
+    if (showingStateScreen_ && stateScreenKind_ == StateScreenKind::kError) {
+      clearStateScreen();
+    }
+  }
   profile_ = mapProfile(state);
   network_ = state.network;
   language_ = state.settings.language;
@@ -122,35 +201,27 @@ void WideUiBridge::setAppState(const AppState& state) {
 
 void WideUiBridge::loadSlide(int index) {
   lv_obj_t* next = nullptr;
-  char buf[16];
-  using trophy::Str;
-  using trophy::tr;
   switch (index) {
     case 0:
       next = trophy::build_dashboard_screen_wide(profile_, language_);
       break;
     case 1:
-      next = trophy::build_trophy_screen_wide(trophy::TrophyKind::Platinum, profile_.platinum, 0, 4, language_);
+      next = trophy::build_trophies_overview_screen_wide(profile_, language_);
       break;
     case 2:
-      next = trophy::build_trophy_screen_wide(trophy::TrophyKind::Gold, profile_.gold, 1, 4, language_);
+      next = trophy::build_trophy_screen_wide(trophy::TrophyKind::Platinum, profile_.platinum, profile_.total, 0, 4, language_);
       break;
     case 3:
-      next = trophy::build_trophy_screen_wide(trophy::TrophyKind::Silver, profile_.silver, 2, 4, language_);
+      next = trophy::build_trophy_screen_wide(trophy::TrophyKind::Gold, profile_.gold, profile_.total, 1, 4, language_);
       break;
     case 4:
-      next = trophy::build_trophy_screen_wide(trophy::TrophyKind::Bronze, profile_.bronze, 3, 4, language_);
+      next = trophy::build_trophy_screen_wide(trophy::TrophyKind::Silver, profile_.silver, profile_.total, 2, 4, language_);
       break;
     case 5:
-      next = trophy::build_stat_screen_wide(trophy::StatIconKind::Gamepad,
-                                             trophy::format_number(profile_.games_completed).c_str(),
-                                             tr(language_, Str::kGamesCompleted), 0, 4);
+      next = trophy::build_trophy_screen_wide(trophy::TrophyKind::Bronze, profile_.bronze, profile_.total, 3, 4, language_);
       break;
     case 6:
-      std::snprintf(buf, sizeof(buf), "%d %%", profile_.completion);
-      next = trophy::build_stat_screen_wide(trophy::StatIconKind::Percent, buf,
-                                             tr(language_, Str::kStatCompletionCaption), 1,
-                                             4);
+      next = trophy::build_statistics_overview_screen_wide(profile_, language_);
       break;
     case 7:
       next = trophy::build_stat_screen_wide(trophy::StatIconKind::Medal, profile_.world_rank.c_str(),
@@ -216,6 +287,7 @@ void WideUiBridge::tick(uint32_t nowMillis) {
       // qui tournait dans le vide pendant l'ecran de connexion.
       slideIndex_ = 0;
       lastSlideMs_ = nowMillis;
+      clearStateScreen();
       loadSlide(slideIndex_);
     }
     return;

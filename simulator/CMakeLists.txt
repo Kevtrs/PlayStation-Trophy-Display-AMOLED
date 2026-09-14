@@ -7,7 +7,7 @@ set(CMAKE_C_STANDARD 11)
 
 set(REPO_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
 set(SDL2_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/third_party/SDL2)
-set(LVGL_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lvgl)
+set(LVGL_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lvgl-9.5.0)
 
 # --- LVGL (identique a la version epinglee par le firmware, voir
 # third_party/NOTICE.md) : compilee ici comme simple bibliotheque C. ---
@@ -29,7 +29,11 @@ file(GLOB ROUND_UI_SOURCES
     ${REPO_ROOT}/src/widgets/widgets.cpp
     ${REPO_ROOT}/src/screens/screens.cpp
     ${REPO_ROOT}/src/assets/lucide_icons.cpp
+    ${REPO_ROOT}/src/assets/board7_icons.cpp
     ${REPO_ROOT}/src/assets/pocketpsn_logo.cpp
+    ${REPO_ROOT}/src/assets/ps_plus_badge.cpp
+    ${REPO_ROOT}/src/assets/profile_avatar.cpp
+    ${REPO_ROOT}/src/assets/profile_avatar_demo.cpp
     ${REPO_ROOT}/src/assets/premium_trophies.cpp
     ${REPO_ROOT}/src/assets/fonts/*.c
     ${REPO_ROOT}/src/ui/app.cpp
@@ -122,7 +126,11 @@ add_executable(trophy-display-simulator-wide
     ${REPO_ROOT}/src/widgets/widgets.cpp
     ${REPO_ROOT}/src/screens/screens_wide.cpp
     ${REPO_ROOT}/src/assets/lucide_icons.cpp
+    ${REPO_ROOT}/src/assets/board7_icons.cpp
     ${REPO_ROOT}/src/assets/pocketpsn_logo.cpp
+    ${REPO_ROOT}/src/assets/ps_plus_badge.cpp
+    ${REPO_ROOT}/src/assets/profile_avatar.cpp
+    ${REPO_ROOT}/src/assets/profile_avatar_demo.cpp
     ${REPO_ROOT}/src/assets/premium_trophies.cpp
     ${REPO_ROOT}/src/assets/stat_icons.cpp
     ${REPO_ROOT}/src/assets/stat_card_background.cpp
@@ -172,7 +180,11 @@ add_executable(trophy-display-simulator-wide-live
     ${REPO_ROOT}/src/widgets/widgets.cpp
     ${REPO_ROOT}/src/screens/screens_wide.cpp
     ${REPO_ROOT}/src/assets/lucide_icons.cpp
+    ${REPO_ROOT}/src/assets/board7_icons.cpp
     ${REPO_ROOT}/src/assets/pocketpsn_logo.cpp
+    ${REPO_ROOT}/src/assets/ps_plus_badge.cpp
+    ${REPO_ROOT}/src/assets/profile_avatar.cpp
+    ${REPO_ROOT}/src/assets/profile_avatar_demo.cpp
     ${REPO_ROOT}/src/assets/premium_trophies.cpp
     ${REPO_ROOT}/src/assets/stat_icons.cpp
     ${REPO_ROOT}/src/assets/stat_card_background.cpp

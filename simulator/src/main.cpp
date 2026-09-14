@@ -37,6 +37,7 @@
 #include "storage/TrophyCache.h"
 #include "services/PendingRestart.h"
 #include "services/SyncService.h"
+#include "assets/profile_avatar.hpp"
 #include "ui/RoundUiBridge.h"
 #include "ui/GestureRecognizer.h"
 #include "ui/Layout.h"
@@ -184,6 +185,27 @@ bool runPocketPsnParserSelfTest() {
     check("PocketPsnParser virgule trainante isolee : donnees correctement lues malgre la virgule",
           r.profile.username == "TrailingCommaUser" && r.stats.totalTrophies == 5);
   }
+
+  return allPassed;
+}
+
+bool runProfileAvatarSelfTest() {
+  bool allPassed = true;
+  auto check = [&](const char* label, bool condition) {
+    std::printf("[selftest] %s: %s\n", label, condition ? "PASS" : "FAIL");
+    if (!condition) allPassed = false;
+  };
+
+  check("ProfileAvatar : nom Pocket PSN accepte",
+        assets::is_safe_pocketpsn_avatar_name("A2117_l.png"));
+  check("ProfileAvatar : URL priorise img.pocketpsn.com",
+        assets::pocketpsn_avatar_url("A2117_l.png") ==
+            "https://img.pocketpsn.com/psn_avatars/A2117_l.png");
+  check("ProfileAvatar : demo A2117 resolu en image LVGL",
+        assets::profile_avatar_descriptor("A2117_l.png") != nullptr);
+  check("ProfileAvatar : champ absent -> URL vide", assets::pocketpsn_avatar_url("").empty());
+  check("ProfileAvatar : traversal refuse", !assets::is_safe_pocketpsn_avatar_name("../secret.png"));
+  check("ProfileAvatar : extension non PNG refusee", !assets::is_safe_pocketpsn_avatar_name("A2117_l.jpg"));
 
   return allPassed;
 }
@@ -2402,6 +2424,7 @@ int main(int argc, char** argv) {
 
   if (selfTest) {
     bool passed = runDebugPanelSelfTest(uiManager, appController, wifiStub);
+    passed = runProfileAvatarSelfTest() && passed;
     passed = runPocketPsnParserSelfTest() && passed;
     passed = runPocketPsnIntegrationSelfTest() && passed;
     passed = runAppControllerLongRunSelfTest() && passed;

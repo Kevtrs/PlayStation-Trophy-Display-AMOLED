@@ -72,4 +72,11 @@ class WideUiBridge : public UiBridge {
   bool everSynced_ = false;
   uint32_t lastSyncMillis_ = 0;
   uint32_t lastSeenSyncEpoch_ = 0;
+  bool showingStateScreen_ = false;
+  StateScreenKind stateScreenKind_ = StateScreenKind::kNone;
+  SyncState lastRawSyncState_ = SyncState::kIdle;
+  bool syncStateDismissed_ = false;
+  SyncState dismissedSyncState_ = SyncState::kIdle;
+  int lastErrorCode_ = 0;
+  std::string lastErrorMessage_;
 };

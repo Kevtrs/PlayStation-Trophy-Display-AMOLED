@@ -7,13 +7,9 @@
 // examples/Arduino/examples/10_lvgl_v9_demo (vendorise dans
 // src/board7inch/esp_lv_adapter_arduino.{h,cpp}).
 //
-// Design volontairement passif (voir screens_wide.cpp / WideUiBridge.h,
-// decision utilisateur du 2026-07-28 "meme pas besoin du tactile, juste ca
-// defile") : le GT911 est initialise materiellement par la librairie
-// (ESP_PANEL_BOARD_USE_TOUCH=1 dans la config vendorisee) mais jamais
-// enregistre aupres de LVGL -- pret pour un futur ecran de reglages sans
-// reflasher la config materielle, sans jamais etre requis pour l'usage
-// normal.
+// Design majoritairement passif (voir screens_wide.cpp / WideUiBridge.h) :
+// le carrousel defile seul, mais le GT911 est aussi enregistre aupres de
+// LVGL pour permettre un acces direct aux reglages depuis la roue crantee.
 //
 // MATERIEL JAMAIS TESTE avant ce soir (2026-07-28). Si l'ecran reste noir
 // au premier flash, verifier au moniteur serie (115200 bauds) dans l'ordre :
@@ -39,6 +35,8 @@
 #include "board7inch/esp_lv_adapter_arduino.h"
 #include "config/ConfigManager.h"
 #include "data/DemoDataProvider.h"
+#include "drivers/bus/esp_panel_bus_i2c.hpp"
+#include "drivers/touch/esp_panel_touch_gt911.hpp"
 #include "data/PocketPsnProvider.h"
 #include "data/ProviderFactory.h"
 #include "network/PocketPsnHttpClient.h"
@@ -67,6 +65,8 @@ PocketPsnProvider* pocketPsnProvider = nullptr;
 AppController* appController = nullptr;
 CaptivePortalServer* captivePortalServer = nullptr;
 PanelBrightnessBackend* brightnessBackend = nullptr;
+BusI2C* manualTouchBus = nullptr;
+TouchGT911* manualTouch = nullptr;
 
 void logDiagnostics() {
   Logger::info("=== PlayStation Trophy Display -- board 7\" (800x480 RGB) -- diagnostics de demarrage ===");
@@ -79,6 +79,53 @@ void logDiagnostics() {
     Logger::error("PSRAM introuvable -- verifier board_build.arduino.memory_type=qio_opi");
   }
   Logger::info("Heap libre: %u octets", ESP.getFreeHeap());
+}
+
+Touch* createPollingGt911Touch(LCD* lcd) {
+  if (lcd == nullptr) return nullptr;
+
+  const uint8_t addresses[] = {
+      ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS,
+      ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS_BACKUP,
+  };
+
+  for (uint8_t address : addresses) {
+    BusI2C::ControlPanelFullConfig ioConfig =
+        ESP_LCD_TOUCH_IO_I2C_GT911_CONFIG_WITH_ADDR(address);
+    auto* bus = new BusI2C(I2C_NUM_0, ioConfig);
+
+    Touch::DeviceFullConfig deviceConfig = {};
+    deviceConfig.x_max = static_cast<uint16_t>(lcd->getFrameWidth());
+    deviceConfig.y_max = static_cast<uint16_t>(lcd->getFrameHeight());
+    deviceConfig.rst_gpio_num = GPIO_NUM_NC;
+    deviceConfig.int_gpio_num = GPIO_NUM_NC;
+    deviceConfig.levels.reset = 0;
+    deviceConfig.levels.interrupt = 0;
+    deviceConfig.flags.swap_xy = 0;
+    deviceConfig.flags.mirror_x = 0;
+    deviceConfig.flags.mirror_y = 0;
+    deviceConfig.process_coordinates = nullptr;
+    deviceConfig.interrupt_callback = nullptr;
+    deviceConfig.user_data = nullptr;
+    deviceConfig.driver_data = nullptr;
+
+    Touch::Config touchConfig = {};
+    touchConfig.device = deviceConfig;
+
+    auto* touch = new TouchGT911(bus, touchConfig);
+    if (touch->begin()) {
+      manualTouchBus = bus;
+      manualTouch = touch;
+      Logger::info("[BOOT] Touch: GT911 polling initialise sans IRQ (adresse 0x%02X)", address);
+      return manualTouch;
+    }
+
+    Logger::warn("[BOOT] Touch: GT911 polling non detecte a l'adresse 0x%02X", address);
+    delete touch;
+    delete bus;
+  }
+
+  return nullptr;
 }
 
 }  // namespace
@@ -139,9 +186,20 @@ void setup() {
     while (true) delay(1000);
   }
 
-  // Tactile GT911 initialise materiellement par board->begin() (voir
-  // esp_panel_board_custom_conf.h) mais volontairement NON enregistre
-  // aupres de LVGL -- voir commentaire d'en-tete.
+  Touch* touch = board->getTouch();
+  if (touch == nullptr) {
+    touch = createPollingGt911Touch(lcd);
+  }
+  if (touch != nullptr) {
+    esp_lv_adapter_touch_config_t touchConfig = ESP_LV_ADAPTER_TOUCH_DEFAULT_CONFIG(disp, touch);
+    if (esp_lv_adapter_register_touch(&touchConfig) == nullptr) {
+      Logger::error("[BOOT] Touch: GT911 present mais enregistrement LVGL impossible");
+    } else {
+      Logger::info("[BOOT] Touch: GT911 enregistre dans LVGL");
+    }
+  } else {
+    Logger::warn("[BOOT] Touch: GT911 indisponible, l'ecran reste en defilement passif");
+  }
 
   ESP_ERROR_CHECK(esp_lv_adapter_start());
   Logger::info("[BOOT] LVGL demarre (tache dediee, %dx%d)", lcd->getFrameWidth(), lcd->getFrameHeight());

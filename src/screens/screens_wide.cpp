@@ -1,7 +1,10 @@
 #include "screens/screens_wide.hpp"
 
 #include "assets/fonts/td_fonts.hpp"
+#include "assets/board7_icons.hpp"
 #include "assets/pocketpsn_logo.hpp"
+#include "assets/ps_plus_badge.hpp"
+#include "assets/profile_avatar.hpp"
 #include "assets/stat_card_background.hpp"
 #include "assets/stat_glow_dot.hpp"
 #include "assets/stat_icons.hpp"
@@ -13,6 +16,7 @@
 #include "ui/strings.hpp"
 #include "widgets/widgets.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -30,6 +34,17 @@ lv_color_t trophy_color_wide(TrophyKind kind) {
         case TrophyKind::Multiple: return colors.accent_cyan;
     }
     return colors.accent_cyan;
+}
+
+const char *trophy_focus_label_wide(TrophyKind kind) {
+    switch(kind) {
+        case TrophyKind::Platinum: return "Chef-d'oeuvre";
+        case TrophyKind::Gold: return "Performance";
+        case TrophyKind::Silver: return "Progression";
+        case TrophyKind::Bronze: return "Collection";
+        case TrophyKind::Multiple: return "Trophees";
+    }
+    return "Trophees";
 }
 
 lv_obj_t *wide_screen_root() {
@@ -75,12 +90,141 @@ lv_obj_t *make_glow_arc_top(lv_obj_t *parent, int size, lv_color_t color, int wi
     return arc;
 }
 
+lv_opa_t wide_opa_pct(int pct) {
+    return static_cast<lv_opa_t>(std::clamp(pct, 0, 100) * LV_OPA_COVER / 100);
+}
+
+lv_obj_t *wide_bg_rect(lv_obj_t *parent, int x, int y, int w, int h, lv_color_t fill, lv_opa_t fill_opa,
+                       lv_color_t border, lv_opa_t border_opa, int border_width = 0, int radius = 0) {
+    lv_obj_t *obj = lv_obj_create(parent);
+    lv_obj_remove_style_all(obj);
+    lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(obj, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_size(obj, w, h);
+    lv_obj_set_pos(obj, x, y);
+    lv_obj_set_style_radius(obj, radius, 0);
+    lv_obj_set_style_bg_color(obj, fill, 0);
+    lv_obj_set_style_bg_opa(obj, fill_opa, 0);
+    lv_obj_set_style_border_color(obj, border, 0);
+    lv_obj_set_style_border_opa(obj, border_opa, 0);
+    lv_obj_set_style_border_width(obj, border_width, 0);
+    return obj;
+}
+
+void wide_bg_arc(lv_obj_t *root, int size, int x, int y, lv_color_t color, lv_opa_t opa, int width) {
+    lv_obj_t *arc = lv_arc_create(root);
+    lv_obj_remove_style_all(arc);
+    lv_obj_clear_flag(arc, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(arc, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_size(arc, size, size);
+    lv_obj_set_pos(arc, x, y);
+    lv_arc_set_range(arc, 0, 100);
+    lv_arc_set_value(arc, 100);
+    lv_arc_set_bg_angles(arc, 0, 360);
+    lv_obj_set_style_arc_color(arc, color, LV_PART_MAIN);
+    lv_obj_set_style_arc_opa(arc, opa, LV_PART_MAIN);
+    lv_obj_set_style_arc_width(arc, width, LV_PART_MAIN);
+    lv_obj_set_style_arc_rounded(arc, true, LV_PART_MAIN);
+    lv_obj_set_style_arc_width(arc, 0, LV_PART_INDICATOR);
+}
+
+void wide_bg_polyline(lv_obj_t *root, const lv_point_precise_t *points, uint32_t point_count, lv_color_t color, int opacity,
+                      int width) {
+    lv_point_precise_t *stored = new lv_point_precise_t[point_count];
+    for(uint32_t i = 0; i < point_count; ++i) stored[i] = points[i];
+    lv_obj_t *line = lv_line_create(root);
+    lv_obj_remove_style_all(line);
+    lv_obj_clear_flag(line, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(line, LV_OBJ_FLAG_CLICKABLE);
+    lv_line_set_points(line, stored, point_count);
+    lv_obj_set_style_line_color(line, color, 0);
+    lv_obj_set_style_line_opa(line, wide_opa_pct(opacity), 0);
+    lv_obj_set_style_line_width(line, width, 0);
+    lv_obj_set_style_line_rounded(line, true, 0);
+    lv_obj_add_event_cb(
+        line,
+        [](lv_event_t *e) {
+            delete[] static_cast<lv_point_precise_t *>(lv_event_get_user_data(e));
+        },
+        LV_EVENT_DELETE, stored);
+}
+
+template <size_t N>
+void wide_bg_polyline(lv_obj_t *root, const lv_point_precise_t (&points)[N], lv_color_t color, int opacity, int width) {
+    wide_bg_polyline(root, points, static_cast<uint32_t>(N), color, opacity, width);
+}
+
+void wide_bg_button_mark(lv_obj_t *root, char kind, int x, int y, int size, lv_color_t color, int opacity, int width = 2) {
+    switch(kind) {
+        case 's':
+            wide_bg_rect(root, x, y, size, size, lv_color_hex(0x000000), LV_OPA_TRANSP, color, wide_opa_pct(opacity),
+                         width, std::max(4, size / 10));
+            break;
+        case 'o':
+            wide_bg_arc(root, size, x, y, color, wide_opa_pct(opacity), width);
+            break;
+        case 'x': {
+            const int inset = std::max(1, size / 8);
+            const lv_point_precise_t slash_a[] = {
+                {static_cast<lv_value_precise_t>(x + inset), static_cast<lv_value_precise_t>(y + inset)},
+                {static_cast<lv_value_precise_t>(x + size - inset), static_cast<lv_value_precise_t>(y + size - inset)},
+            };
+            const lv_point_precise_t slash_b[] = {
+                {static_cast<lv_value_precise_t>(x + size - inset), static_cast<lv_value_precise_t>(y + inset)},
+                {static_cast<lv_value_precise_t>(x + inset), static_cast<lv_value_precise_t>(y + size - inset)},
+            };
+            wide_bg_polyline(root, slash_a, color, opacity, width);
+            wide_bg_polyline(root, slash_b, color, opacity, width);
+            break;
+        }
+        case 't': {
+            const int half = size / 2;
+            const lv_point_precise_t tri[] = {
+                {static_cast<lv_value_precise_t>(x + half), static_cast<lv_value_precise_t>(y)},
+                {static_cast<lv_value_precise_t>(x + size), static_cast<lv_value_precise_t>(y + size)},
+                {static_cast<lv_value_precise_t>(x), static_cast<lv_value_precise_t>(y + size)},
+                {static_cast<lv_value_precise_t>(x + half), static_cast<lv_value_precise_t>(y)},
+            };
+            wide_bg_polyline(root, tri, color, opacity, width);
+            break;
+        }
+    }
+}
+
+void wide_bg_neon_button(lv_obj_t *root, char kind, int x, int y, int size, lv_color_t color, int opacity, int width = 2) {
+    wide_bg_button_mark(root, kind, x - 2, y - 2, size + 4, color, std::max(3, opacity / 2), width + 2);
+    wide_bg_button_mark(root, kind, x, y, size, color, opacity, width);
+}
+
 void ambient_rings(lv_obj_t *root, lv_color_t accent) {
-    lv_obj_t *far = make_glow_arc_top(root, 760, accent, 1, LV_OPA_10);
+    const lv_color_t ps_blue = lv_color_hex(0x0A55C8);
+    wide_bg_rect(root, 0, 0, WIDE_WIDTH, WIDE_HEIGHT, lv_color_hex(0x000612), LV_OPA_COVER, lv_color_hex(0x000612),
+                 LV_OPA_TRANSP);
+
+    const char kinds[] = {'s', 'o', 'x', 't'};
+    for(int row = 0; row < 5; ++row) {
+        for(int col = 0; col < 8; ++col) {
+            const int x = -18 + col * 108 + (row % 2) * 42;
+            const int y = 24 + row * 86;
+            const int variant = (row * 3 + col * 5) % 4;
+            const int size = 18 + ((row + col) % 3) * 8;
+            wide_bg_neon_button(root, kinds[variant], x, y, size, ps_blue, 14 - ((row + col) % 3) * 2, 2);
+        }
+    }
+    for(int row = 0; row < 4; ++row) {
+        for(int col = 0; col < 7; ++col) {
+            const int x = 34 + col * 114 + (row % 2) * 22;
+            const int y = 66 + row * 96;
+            const int variant = (row + col + 2) % 4;
+            wide_bg_neon_button(root, kinds[variant], x, y, 16 + ((row + col) % 2) * 8, ps_blue, 10, 2);
+        }
+    }
+
+    lv_obj_t *far = make_glow_arc_top(root, 760, ps_blue, 1, LV_OPA_10);
     lv_obj_set_pos(far, wide_center_x(760), WIDE_HERO_HALO_Y - 380);
-    lv_obj_t *outer = make_glow_arc_top(root, 620, colors.accent_cyan, 1, LV_OPA_20);
+    lv_obj_t *outer = make_glow_arc_top(root, 620, ps_blue, 1, LV_OPA_10);
     lv_obj_set_pos(outer, wide_center_x(620), WIDE_HERO_HALO_Y - 310);
-    lv_obj_t *inner = make_glow_arc_top(root, 480, accent, 1, LV_OPA_20);
+    lv_obj_t *inner = make_glow_arc_top(root, 480, accent, 1, LV_OPA_10);
     lv_obj_set_pos(inner, wide_center_x(480), WIDE_HERO_HALO_Y - 240);
 }
 
@@ -206,181 +350,470 @@ lv_obj_t *label(lv_obj_t *parent, const char *text, const lv_font_t *font, lv_co
     return obj;
 }
 
+lv_obj_t *wide_progress_bar(lv_obj_t *parent, int x, int y, int w, int h, int value, lv_color_t accent) {
+    lv_obj_t *bar = lv_bar_create(parent);
+    lv_obj_remove_style_all(bar);
+    lv_obj_set_size(bar, w, h);
+    lv_obj_set_pos(bar, x, y);
+    lv_bar_set_range(bar, 0, 100);
+    lv_bar_set_value(bar, std::clamp(value, 0, 100), LV_ANIM_OFF);
+    lv_obj_set_style_bg_color(bar, colors.surface_secondary, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_radius(bar, h / 2, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(bar, accent, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(bar, h / 2, LV_PART_INDICATOR);
+    lv_obj_clear_flag(bar, LV_OBJ_FLAG_CLICKABLE);
+    return bar;
+}
+
+lv_obj_t *wide_icon_circle(lv_obj_t *parent, const char *icon, int cx, int cy, int box, int glyph, lv_color_t color) {
+    lv_obj_t *holder = lv_obj_create(parent);
+    lv_obj_remove_style_all(holder);
+    lv_obj_clear_flag(holder, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(holder, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_size(holder, box, box);
+    lv_obj_set_pos(holder, cx - box / 2, cy - box / 2);
+    lv_obj_set_style_radius(holder, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(holder, colors.surface_primary, 0);
+    lv_obj_set_style_bg_opa(holder, LV_OPA_50, 0);
+    lv_obj_set_style_border_width(holder, 2, 0);
+    lv_obj_set_style_border_color(holder, color, 0);
+    lv_obj_set_style_border_opa(holder, LV_OPA_80, 0);
+
+    if(const lv_image_dsc_t *dsc = board7_icon_descriptor(icon, glyph)) {
+        const int asset_size = glyph <= 24 ? 24 : (glyph <= 32 ? 32 : 48);
+        lv_obj_t *inner = lv_image_create(holder);
+        lv_image_set_src(inner, dsc);
+        lv_obj_set_size(inner, asset_size, asset_size);
+        lv_image_set_inner_align(inner, LV_IMAGE_ALIGN_CONTAIN);
+        lv_obj_set_style_image_recolor(inner, color, 0);
+        lv_obj_set_style_image_recolor_opa(inner, LV_OPA_COVER, 0);
+        lv_obj_center(inner);
+    } else {
+        lv_obj_t *inner = make_icon_box(holder, icon, glyph + 10, glyph, color);
+        lv_obj_center(inner);
+    }
+    return holder;
+}
+
+void add_profile_avatar_content(lv_obj_t *avatar, const ProfileData &p, int image_size, int icon_box_size,
+                                int icon_size, lv_color_t fallback_color) {
+    lv_obj_set_style_clip_corner(avatar, true, 0);
+    const lv_image_dsc_t *avatar_dsc = assets::profile_avatar_descriptor(p.avatar_file_name);
+    if(avatar_dsc) {
+        lv_obj_t *img = lv_image_create(avatar);
+        lv_image_set_src(img, avatar_dsc);
+        lv_image_set_inner_align(img, LV_IMAGE_ALIGN_COVER);
+        lv_obj_set_size(img, image_size, image_size);
+        lv_obj_center(img);
+        return;
+    }
+
+    lv_obj_t *avatar_icon = make_icon_box(avatar, "circle-user-round", icon_box_size, icon_size, fallback_color);
+    lv_obj_center(avatar_icon);
+}
+
+void dashboard_status_badge(lv_obj_t *root, const char *text) {
+    lv_obj_t *badge = wide_bg_rect(root, 650, 67, 104, 28, lv_color_hex(0x03120F), wide_opa_pct(92),
+                                   colors.success, LV_OPA_80, 1, 14);
+    lv_obj_t *glyph = make_icon_box(badge, "circle-dot", 18, 10, colors.success);
+    lv_obj_set_pos(glyph, 9, 5);
+    label(badge, text, &td_font_12, colors.text_primary, 30, 5, 66, LV_TEXT_ALIGN_LEFT);
+}
+
+void dashboard_country_chip(lv_obj_t *root, int x, int y, const std::string &country) {
+    lv_obj_t *chip = wide_bg_rect(root, x, y, 56, 28, lv_color_hex(0x061A2F), wide_opa_pct(90),
+                                  colors.accent_blue, LV_OPA_90, 1, 14);
+    constexpr int flag_w = 18;
+    constexpr int flag_h = 12;
+    constexpr int label_w = 18;
+    constexpr int gap = 5;
+    constexpr int group_w = flag_w + gap + label_w;
+    const int flag_x = (56 - group_w) / 2;
+    const int flag_y = (28 - flag_h) / 2;
+    wide_bg_rect(chip, flag_x, flag_y, flag_w, flag_h, colors.text_primary, LV_OPA_COVER, colors.text_primary,
+                 LV_OPA_TRANSP, 0, 2);
+    wide_bg_rect(chip, flag_x, flag_y, 6, flag_h, lv_color_hex(0x2446A8), LV_OPA_COVER, lv_color_hex(0x2446A8),
+                 LV_OPA_TRANSP);
+    wide_bg_rect(chip, flag_x + 12, flag_y, 6, flag_h, lv_color_hex(0xE63B45), LV_OPA_COVER, lv_color_hex(0xE63B45),
+                 LV_OPA_TRANSP);
+    label(chip, country.empty() ? "--" : country.c_str(), &td_font_12, colors.text_primary, flag_x + flag_w + gap, 7,
+          label_w, LV_TEXT_ALIGN_CENTER);
+}
+
+void dashboard_ps_plus_chip(lv_obj_t *root, int x, int y) {
+    wide_bg_rect(root, x - 2, y - 2, 44, 44, colors.gold, wide_opa_pct(8), colors.gold, LV_OPA_TRANSP, 0, 22);
+    lv_obj_t *img = lv_image_create(root);
+    lv_image_set_src(img, assets::ps_plus_badge_descriptor());
+    lv_obj_set_size(img, 40, 40);
+    lv_obj_set_pos(img, x, y);
+    lv_obj_clear_flag(img, LV_OBJ_FLAG_CLICKABLE);
+}
+
+void dashboard_glow_pill(lv_obj_t *root, int x, int y, int w, int h, lv_color_t accent) {
+    wide_bg_rect(root, x, y, w, h, accent, wide_opa_pct(7), accent, LV_OPA_TRANSP, 0, h / 2);
+}
+
+void dashboard_xp_ring(lv_obj_t *parent, int cx, int cy, int size, int percent) {
+    lv_obj_t *bg = lv_arc_create(parent);
+    lv_obj_remove_style_all(bg);
+    lv_obj_clear_flag(bg, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(bg, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_size(bg, size, size);
+    lv_obj_set_pos(bg, cx - size / 2, cy - size / 2);
+    lv_arc_set_range(bg, 0, 100);
+    lv_arc_set_value(bg, 100);
+    lv_arc_set_bg_angles(bg, 130, 50);
+    lv_obj_set_style_arc_color(bg, lv_color_hex(0x113052), LV_PART_MAIN);
+    lv_obj_set_style_arc_width(bg, 16, LV_PART_MAIN);
+    lv_obj_set_style_arc_rounded(bg, false, LV_PART_MAIN);
+    lv_obj_set_style_arc_width(bg, 0, LV_PART_INDICATOR);
+
+    lv_obj_t *arc = lv_arc_create(parent);
+    lv_obj_remove_style_all(arc);
+    lv_obj_clear_flag(arc, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(arc, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_size(arc, size, size);
+    lv_obj_set_pos(arc, cx - size / 2, cy - size / 2);
+    lv_arc_set_range(arc, 0, 100);
+    lv_arc_set_value(arc, std::clamp(percent, 0, 100));
+    lv_arc_set_bg_angles(arc, 130, 50);
+    lv_obj_set_style_arc_width(arc, 0, LV_PART_MAIN);
+    lv_obj_set_style_arc_color(arc, colors.accent_cyan, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_width(arc, 16, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_rounded(arc, false, LV_PART_INDICATOR);
+
+    lv_obj_t *tick = lv_arc_create(parent);
+    lv_obj_remove_style_all(tick);
+    lv_obj_clear_flag(tick, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(tick, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_size(tick, size, size);
+    lv_obj_set_pos(tick, cx - size / 2, cy - size / 2);
+    lv_arc_set_range(tick, 0, 100);
+    lv_arc_set_value(tick, 100);
+    lv_arc_set_bg_angles(tick, 137, 142);
+    lv_obj_set_style_arc_width(tick, 8, LV_PART_MAIN);
+    lv_obj_set_style_arc_color(tick, colors.text_primary, LV_PART_MAIN);
+    lv_obj_set_style_arc_width(tick, 0, LV_PART_INDICATOR);
+}
+
+void dashboard_metric_card(lv_obj_t *root, int x, int y, int w, const char *value, const char *caption,
+                           lv_color_t accent) {
+    lv_obj_t *metric = card(root, x, y, w, 80, 12, LV_OPA_80);
+    lv_obj_set_style_border_color(metric, accent, 0);
+    lv_obj_set_style_border_opa(metric, wide_opa_pct(48), 0);
+    label(metric, value, std::strlen(value) > 7 ? &td_font_20 : &td_font_22, colors.text_primary, 8, 21, w - 16,
+          LV_TEXT_ALIGN_CENTER);
+    label(metric, caption, &td_font_12, colors.text_secondary, 8, 50, w - 16, LV_TEXT_ALIGN_CENTER);
+    wide_progress_bar(metric, 22, 70, w - 44, 4, 100, accent);
+}
+
+int trophy_percent_of_total_wide(int value, int total) {
+    if(total <= 0 || value <= 0) return 0;
+    return std::max(1, static_cast<int>(std::round((static_cast<double>(value) * 100.0) / total)));
+}
+
+std::string trophy_percent_text_wide(int value, int total) {
+    char buf[24];
+    const double pct = total > 0 ? (static_cast<double>(value) * 100.0) / total : 0.0;
+    std::snprintf(buf, sizeof(buf), "%.1f %%", pct);
+    return std::string(buf);
+}
+
+std::string trophy_share_sentence_wide(int value, int total) {
+    return trophy_percent_text_wide(value, total) + " de " + format_number(total);
+}
+
+std::string dashboard_username_text(const std::string &username) {
+    if(username.size() <= 10) return username;
+    return username.substr(0, 7) + "...";
+}
+
+void wide_title_block(lv_obj_t *root, const char *title, const char *subtitle, lv_color_t accent = colors.accent_cyan) {
+    label(root, title, &td_font_28, colors.text_primary, 48, 64, 260, LV_TEXT_ALIGN_LEFT);
+    if(subtitle && subtitle[0] != '\0') {
+        label(root, subtitle, &td_font_16, colors.text_secondary, 50, 100, 300, LV_TEXT_ALIGN_LEFT);
+    }
+    wide_bg_rect(root, 50, 125, 198, 2, accent, LV_OPA_COVER, accent, LV_OPA_TRANSP, 0, 1);
+}
+
+void wide_card_accent(lv_obj_t *root, int x, int y, int w, int h, lv_color_t accent, int inset = 34) {
+    wide_bg_rect(root, x + inset, y + 14, w - inset * 2, 1, accent, wide_opa_pct(72), accent, LV_OPA_TRANSP);
+    wide_bg_rect(root, x + inset, y + h - 16, w - inset * 2, 1, accent, wide_opa_pct(18), accent, LV_OPA_TRANSP);
+}
+
+void wide_card_top_accent(lv_obj_t *root, int x, int y, int w, lv_color_t accent, int inset = 34) {
+    wide_bg_rect(root, x + inset, y + 14, w - inset * 2, 1, accent, wide_opa_pct(72), accent, LV_OPA_TRANSP);
+}
+
+int sync_progress_wide(SyncState state, int progress) {
+    if(progress > 0) return std::clamp(progress, 0, 100);
+    switch(state) {
+        case SyncState::Connecting: return 24;
+        case SyncState::Fetching: return 64;
+        case SyncState::Processing: return 82;
+        case SyncState::Done: return 100;
+        case SyncState::Error: return 100;
+        case SyncState::Idle: return 0;
+    }
+    return 0;
+}
+
+const char *sync_title_wide(SyncState state, AppLanguage lang) {
+    if(state == SyncState::Done) return tr(lang, Str::kSyncedTitle);
+    if(state == SyncState::Error) return tr(lang, Str::kErrorBadge);
+    return tr(lang, Str::kSyncingTitle);
+}
+
+const char *sync_subtitle_wide(SyncState state, AppLanguage lang) {
+    switch(state) {
+        case SyncState::Connecting: return tr(lang, Str::kSyncConnectingTitle);
+        case SyncState::Fetching: return tr(lang, Str::kSyncFetching);
+        case SyncState::Processing: return tr(lang, Str::kSyncProcessingTitle);
+        case SyncState::Done: return tr(lang, Str::kDataUpToDate);
+        case SyncState::Error: return tr(lang, Str::kErrSyncFailedTitle);
+        case SyncState::Idle: return tr(lang, Str::kSyncIdle);
+    }
+    return tr(lang, Str::kSyncIdle);
+}
+
+void wide_state_button(lv_obj_t *root, int x, int y, lv_color_t accent, bool error) {
+    wide_bg_rect(root, x, y, 168, 40, error ? lv_color_hex(0x321106) : lv_color_hex(0x042937), wide_opa_pct(94),
+                 accent, LV_OPA_COVER, 1, 21);
+    label(root, "Réessayer", &td_font_14, colors.text_primary, x + 40, y + 11, 88, LV_TEXT_ALIGN_CENTER);
+}
+
+struct SettingsRowTouchContext {
+    lv_obj_t *row;
+    const char *name;
+};
+
+void settings_row_touch_event(lv_event_t *e) {
+    auto *ctx = static_cast<SettingsRowTouchContext *>(lv_event_get_user_data(e));
+    if(ctx == nullptr || ctx->row == nullptr) return;
+
+    const lv_event_code_t code = lv_event_get_code(e);
+    if(code == LV_EVENT_PRESSED) {
+        lv_obj_set_style_bg_opa(ctx->row, wide_opa_pct(96), 0);
+        lv_obj_set_style_border_opa(ctx->row, LV_OPA_COVER, 0);
+        return;
+    }
+    if(code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
+        lv_obj_set_style_bg_opa(ctx->row, LV_OPA_80, 0);
+        lv_obj_set_style_border_opa(ctx->row, wide_opa_pct(78), 0);
+        return;
+    }
+    if(code == LV_EVENT_CLICKED) {
+        std::printf("[UI 7] Reglages ligne tactile: %s\n", ctx->name ? ctx->name : "-");
+        return;
+    }
+    if(code == LV_EVENT_DELETE) {
+        delete ctx;
+    }
+}
+
+void settings_row_wide(lv_obj_t *root, int y, const char *icon, const char *name, const char *value, lv_color_t accent,
+                       int bar_pct = -1, bool toggle = false) {
+    lv_obj_t *row = card(root, 77, y, 646, 44, 22, LV_OPA_80);
+    lv_obj_set_style_border_color(row, accent, 0);
+    lv_obj_set_style_border_opa(row, wide_opa_pct(78), 0);
+    lv_obj_set_style_border_width(row, 1, 0);
+    wide_icon_circle(root, icon, 108, y + 22, 30, 18, accent);
+    label(root, name, &td_font_16, colors.text_primary, 144, y + 13, 260, LV_TEXT_ALIGN_LEFT);
+
+    if(bar_pct >= 0) {
+        wide_progress_bar(root, 506, y + 20, 86, 5, bar_pct, accent);
+        label(root, value, &td_font_12, colors.text_secondary, 600, y + 14, 32, LV_TEXT_ALIGN_RIGHT);
+    } else if(toggle) {
+        wide_bg_rect(root, 640, y + 12, 48, 20, lv_color_hex(0x03120F), wide_opa_pct(95), accent, LV_OPA_80, 1, 10);
+        wide_bg_rect(root, 672, y + 17, 10, 10, accent, LV_OPA_COVER, accent, LV_OPA_TRANSP, 0, LV_RADIUS_CIRCLE);
+        label(root, value, &td_font_12, colors.text_secondary, 600, y + 14, 32, LV_TEXT_ALIGN_RIGHT);
+    } else {
+        label(root, value, &td_font_12, colors.text_secondary, 604, y + 14, 86, LV_TEXT_ALIGN_RIGHT);
+    }
+
+    lv_obj_t *hit = lv_obj_create(root);
+    lv_obj_remove_style_all(hit);
+    lv_obj_clear_flag(hit, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(hit, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_size(hit, 646, 48);
+    lv_obj_set_pos(hit, 77, y - 2);
+    lv_obj_set_style_bg_opa(hit, LV_OPA_TRANSP, 0);
+    auto *ctx = new SettingsRowTouchContext{row, name};
+    lv_obj_add_event_cb(hit, settings_row_touch_event, LV_EVENT_ALL, ctx);
+}
+
+void trophy_overview_row(lv_obj_t *root, TrophyKind kind, int value, int total, int y, AppLanguage lang) {
+    const lv_color_t accent = trophy_color_wide(kind);
+    const int share = trophy_percent_of_total_wide(value, total);
+    const std::string value_text = format_number(value);
+    const std::string pct_text = trophy_percent_text_wide(value, total);
+
+    lv_obj_t *row = card(root, 72, y, 656, 58, 14, LV_OPA_80);
+    lv_obj_set_style_border_color(row, accent, 0);
+    lv_obj_set_style_border_opa(row, kind == TrophyKind::Platinum ? LV_OPA_80 : wide_opa_pct(62), 0);
+    wide_bg_rect(row, 1, 1, 654, 1, accent, wide_opa_pct(18), accent, LV_OPA_TRANSP);
+
+    lv_obj_t *icon = make_trophy_icon(row, kind, 44);
+    lv_obj_set_pos(icon, 20, 7);
+    label(row, trophy_kind_label(kind, lang), &td_font_20, colors.text_primary, 86, 13, 120, LV_TEXT_ALIGN_LEFT);
+    label(row, pct_text.c_str(), &td_font_10, colors.text_secondary, 86, 36, 64, LV_TEXT_ALIGN_LEFT);
+    wide_progress_bar(row, 262, 42, 286, 4, share, accent);
+    label(row, value_text.c_str(), &td_font_20, kind == TrophyKind::Bronze ? accent : colors.text_primary, 570, 15,
+          62, LV_TEXT_ALIGN_RIGHT);
+}
+
 } // namespace
 
 lv_obj_t *build_dashboard_screen_wide(const ProfileData &p, AppLanguage lang) {
     lv_obj_t *root = wide_screen_root();
     ambient_rings(root, colors.accent_cyan);
 
-    make_status_badge(root, p.offline ? tr(lang, Str::kOffline) : sync_state_label(p.sync, lang), colors.success,
-                       WIDE_DASH_STATUS_X, WIDE_DASH_STATUS_Y, "wifi");
+    const int next_level = p.level + 1;
+    const std::string level_text = format_number(p.level);
+    const std::string remaining_text = p.level_remaining_points > 0 ? format_number(p.level_remaining_points) : "-";
+    const std::string progress_text = std::to_string(std::clamp(p.progress, 0, 100)) + "%";
+    const std::string next_level_text = std::to_string(next_level);
+    const char *world_rank = p.world_rank.empty() ? "-" : p.world_rank.c_str();
+    const char *national_rank = p.national_rank.empty() ? "-" : p.national_rank.c_str();
+    const char *trophy_points = p.trophy_points.empty() ? "-" : p.trophy_points.c_str();
 
-    // --- Colonne gauche : profil + niveau + mini-cartes ---
-    lv_obj_t *avatar =
-        card(root, WIDE_DASH_LEFT_X, WIDE_DASH_AVATAR_Y, WIDE_DASH_AVATAR_SIZE, WIDE_DASH_AVATAR_SIZE, LV_RADIUS_CIRCLE, LV_OPA_70);
+    const int profile_x = 36;
+    const int profile_y = 54;
+    const int profile_w = 264;
+    const int profile_h = 334;
+    const int xp_x = 332;
+    const int xp_y = 54;
+    const int xp_w = 432;
+    const int xp_h = 264;
+
+    lv_obj_t *profile_card = card(root, profile_x, profile_y, profile_w, profile_h, 16, LV_OPA_80);
+    lv_obj_set_style_border_color(profile_card, colors.accent_cyan, 0);
+    lv_obj_set_style_border_opa(profile_card, wide_opa_pct(55), 0);
+    wide_bg_rect(root, 58, 70, 220, 2, colors.accent_cyan, LV_OPA_COVER, colors.accent_cyan, LV_OPA_TRANSP);
+
+    lv_obj_t *avatar = card(root, 60, 89, 86, 86, LV_RADIUS_CIRCLE, LV_OPA_70);
     lv_obj_set_style_border_color(avatar, colors.accent_cyan, 0);
-    lv_obj_t *avatar_icon = make_icon_box(avatar, "circle-user-round", 40, 26, colors.accent_cyan);
-    lv_obj_center(avatar_icon);
-    label(root, p.username.c_str(), &td_font_20, colors.text_primary, WIDE_DASH_NAME_X, WIDE_DASH_NAME_Y, 300,
-          LV_TEXT_ALIGN_LEFT);
-    label(root, p.updated.c_str(), &td_font_12, colors.text_muted, WIDE_DASH_NAME_X, WIDE_DASH_META_Y, 300,
-          LV_TEXT_ALIGN_LEFT);
+    lv_obj_set_style_border_opa(avatar, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(avatar, 2, 0);
+    add_profile_avatar_content(avatar, p, 86, 70, 48, colors.accent_cyan);
 
-    char level[32];
-    std::snprintf(level, sizeof(level), "%d", p.level);
-    lv_obj_t *level_lbl = label(root, level, &td_font_96, colors.text_primary, WIDE_DASH_LEFT_X, WIDE_DASH_LEVEL_Y,
-                                 WIDE_DASH_LEVEL_W, LV_TEXT_ALIGN_LEFT);
-    lv_obj_set_style_text_align(level_lbl, LV_TEXT_ALIGN_LEFT, 0);
-    label(root, tr(lang, Str::kLevelLabel), &td_font_12, colors.accent_cyan, WIDE_DASH_LEVEL_META_X,
-          WIDE_DASH_LEVEL_TAG_Y, 200, LV_TEXT_ALIGN_LEFT);
+    const std::string username_text = dashboard_username_text(p.username);
+    lv_obj_t *name = label(root, username_text.c_str(), username_text.size() > 9 ? &td_font_20 : &td_font_24,
+                           colors.text_primary, 164, 106, 118, LV_TEXT_ALIGN_LEFT);
+    lv_obj_set_height(name, 28);
+    lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
+    label(root, "Profil actif", &td_font_12, colors.text_secondary, 166, 138, 100, LV_TEXT_ALIGN_LEFT);
+    dashboard_country_chip(root, 164, 154, p.country);
+    if(p.has_ps_plus) dashboard_ps_plus_chip(root, 236, 150);
 
-    lv_obj_t *xp = lv_bar_create(root);
-    lv_obj_set_size(xp, WIDE_DASH_XP_TRACK_W, 8);
-    lv_obj_set_pos(xp, WIDE_DASH_LEVEL_META_X, WIDE_DASH_XP_TRACK_Y);
-    lv_bar_set_range(xp, 0, 100);
-    lv_bar_set_value(xp, p.progress, LV_ANIM_OFF);
-    lv_obj_set_style_bg_color(xp, colors.surface_secondary, LV_PART_MAIN);
-    lv_obj_set_style_radius(xp, 4, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(xp, colors.accent_cyan, LV_PART_INDICATOR);
-    lv_obj_set_style_radius(xp, 4, LV_PART_INDICATOR);
+    lv_obj_t *level_card = card(root, 57, 207, 222, 160, 14, LV_OPA_80);
+    lv_obj_set_style_bg_color(level_card, lv_color_hex(0x07111A), 0);
+    lv_obj_set_style_bg_opa(level_card, wide_opa_pct(94), 0);
+    lv_obj_set_style_border_color(level_card, colors.accent_cyan, 0);
+    lv_obj_set_style_border_opa(level_card, wide_opa_pct(32), 0);
+    dashboard_glow_pill(root, 72, 254, 172, 76, colors.accent_cyan);
+    wide_bg_rect(root, 72, 220, 96, 26, lv_color_hex(0x001A20), LV_OPA_COVER, colors.accent_cyan, LV_OPA_COVER, 1,
+                 13);
+    label(root, "NIVEAU PSN", &td_font_12, colors.accent_cyan, 72, 226, 96, LV_TEXT_ALIGN_CENTER);
+    label(root, level_text.c_str(), &td_font_96, colors.text_primary, 72, 253, 172, LV_TEXT_ALIGN_CENTER);
+    label(root, remaining_text.c_str(), &td_font_12, colors.text_secondary, 72, 341, 68, LV_TEXT_ALIGN_LEFT);
+    label(root, "pts restants", &td_font_12, colors.text_secondary, 142, 341, 82, LV_TEXT_ALIGN_LEFT);
+    label(root, progress_text.c_str(), &td_font_12, colors.accent_cyan, 230, 341, 36, LV_TEXT_ALIGN_RIGHT);
+    wide_progress_bar(root, 72, 358, 188, 8, p.progress, colors.accent_cyan);
+    label(root, next_level_text.c_str(), &td_font_12, colors.text_secondary, 224, 228, 34, LV_TEXT_ALIGN_RIGHT);
+    label(root, "suivant", &td_font_10, colors.text_muted, 218, 244, 44, LV_TEXT_ALIGN_RIGHT);
 
-    char xp_caption[48];
-    std::snprintf(xp_caption, sizeof(xp_caption), tr(lang, Str::kDashProgressToLevelFormat), p.progress,
-                  p.level + 1);
-    label(root, xp_caption, &td_font_12, colors.text_muted, WIDE_DASH_LEVEL_META_X, WIDE_DASH_XP_CAPTION_Y,
-          WIDE_DASH_XP_CAPTION_W,
-          LV_TEXT_ALIGN_LEFT);
+    lv_obj_t *xp_card = card(root, xp_x, xp_y, xp_w, xp_h, 18, LV_OPA_70);
+    lv_obj_set_style_border_color(xp_card, colors.accent_blue, 0);
+    lv_obj_set_style_border_opa(xp_card, LV_OPA_40, 0);
+    dashboard_status_badge(root, p.offline ? tr(lang, Str::kOffline) : p.updated.c_str());
+    dashboard_xp_ring(root, 548, 186, 216, p.progress);
 
-    lv_obj_t *total_card = card(root, WIDE_DASH_LEFT_X, WIDE_DASH_CARDS_Y, WIDE_DASH_CARD_W, WIDE_DASH_CARD_H);
-    // Icone generique (pas make_trophy_icon(..., TrophyKind::Multiple, ...)
-    // -- cette valeur retombe sur le meme asset que TrophyKind::Platinum,
-    // voir premium_trophies.cpp) : les deux mini-cartes "Trophees" et
-    // "Platine" affichaient donc visuellement la meme icone platine, pretant
-    // a confusion. Retour utilisateur du 2026-07-29 apres le premier flash
-    // reel.
-    lv_obj_t *total_icon = make_icon_box(total_card, "trophy", 40, 26, colors.accent_cyan);
-    lv_obj_set_pos(total_icon, 16, 26);
-    label(total_card, format_number(p.total).c_str(), &td_font_22, colors.text_primary, 66, 20, 112, LV_TEXT_ALIGN_LEFT);
-    label(total_card, tr(lang, Str::kTrophiesUnit), &td_font_10, colors.text_muted, 66, 50, 112, LV_TEXT_ALIGN_LEFT);
-    // Petite barre de pied de carte, purement decorative (ne represente
-    // aucune progression reelle -- pas de valeur "sur 100" pour un total
-    // de trophees) : meme inspiration que la maquette generee, comble le
-    // bas de carte vide.
-    lv_obj_t *total_bar = lv_obj_create(total_card);
-    lv_obj_remove_style_all(total_bar);
-    lv_obj_clear_flag(total_bar, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_size(total_bar, WIDE_DASH_CARD_W - 32, 3);
-    lv_obj_set_pos(total_bar, 16, WIDE_DASH_CARD_H - 16);
-    lv_obj_set_style_radius(total_bar, 2, 0);
-    lv_obj_set_style_bg_color(total_bar, colors.accent_cyan, 0);
-    lv_obj_set_style_bg_opa(total_bar, LV_OPA_60, 0);
+    char center_pct[16];
+    std::snprintf(center_pct, sizeof(center_pct), "%d%%", std::clamp(p.progress, 0, 100));
+    char center_next[48];
+    std::snprintf(center_next, sizeof(center_next), "vers niveau %d", next_level);
+    label(root, center_pct, &td_font_24, colors.text_primary, 506, 148, 84, LV_TEXT_ALIGN_CENTER);
+    label(root, center_next, &td_font_16, colors.text_secondary, 484, 181, 132, LV_TEXT_ALIGN_CENTER);
+    label(root, "progression PSN", &td_font_12, colors.accent_cyan, 491, 214, 116, LV_TEXT_ALIGN_CENTER);
 
-    const int plat_card_x = WIDE_DASH_LEFT_X + WIDE_DASH_CARD_W + WIDE_DASH_CARD_GAP;
-    lv_obj_t *plat_card = card(root, plat_card_x, WIDE_DASH_CARDS_Y, WIDE_DASH_CARD_W, WIDE_DASH_CARD_H);
-    lv_obj_t *plat_icon = make_trophy_icon(plat_card, TrophyKind::Platinum, 40);
-    lv_obj_set_pos(plat_icon, 16, 26);
-    label(plat_card, format_number(p.platinum).c_str(), &td_font_22, colors.platinum, 66, 20, 112, LV_TEXT_ALIGN_LEFT);
-    label(plat_card, tr(lang, Str::kTrophyPlatinum), &td_font_10, colors.text_muted, 66, 50, 112,
-          LV_TEXT_ALIGN_LEFT);
-    lv_obj_t *plat_bar = lv_obj_create(plat_card);
-    lv_obj_remove_style_all(plat_bar);
-    lv_obj_clear_flag(plat_bar, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_size(plat_bar, WIDE_DASH_CARD_W - 32, 3);
-    lv_obj_set_pos(plat_bar, 16, WIDE_DASH_CARD_H - 16);
-    lv_obj_set_style_radius(plat_bar, 2, 0);
-    lv_obj_set_style_bg_color(plat_bar, colors.accent_violet, 0);
-    lv_obj_set_style_bg_opa(plat_bar, LV_OPA_60, 0);
-
-    // --- Colonne droite : trophee platine en grand ---
-    // Meme texture de fond (asset genere par IA) que les ecrans Trophees, reduite a
-    // l'echelle du halo du dashboard (WIDE_DASH_HALO_SIZE=260 vs 340 natif) --
-    // aucun cout flash supplementaire, meme lv_image_dsc_t reutilise. Toujours
-    // SOUS l'anneau colore (make_dual_ring, code) pour la meme raison que sur
-    // les ecrans Trophees : ne pas rivaliser avec le degrade cyan/violet.
-    constexpr int kDashRingAssetSize = 340;
-    constexpr int kDashRingScale = static_cast<int>(256.0 * WIDE_DASH_HALO_SIZE / kDashRingAssetSize + 0.5);
-    lv_obj_t *ring_bg = lv_image_create(root);
-    lv_image_set_src(ring_bg, trophy_ring_descriptor());
-    lv_image_set_scale(ring_bg, kDashRingScale);
-    lv_obj_set_size(ring_bg, WIDE_DASH_HALO_SIZE, WIDE_DASH_HALO_SIZE);
-    lv_obj_set_pos(ring_bg, WIDE_DASH_RIGHT_X + (WIDE_DASH_RIGHT_W - WIDE_DASH_HALO_SIZE) / 2,
-                   wide_center_y(WIDE_DASH_HALO_SIZE));
-
-    lv_obj_t *halo = make_dual_ring(root, WIDE_DASH_HALO_SIZE, colors.accent_cyan, colors.accent_violet, 3,
-                                     LV_OPA_60);
-    lv_obj_set_pos(halo, WIDE_DASH_RIGHT_X + (WIDE_DASH_RIGHT_W - WIDE_DASH_HALO_SIZE) / 2,
-                   wide_center_y(WIDE_DASH_HALO_SIZE));
-    lv_obj_t *halo2 = make_dual_ring(root, WIDE_DASH_HALO_SIZE - 40, colors.accent_cyan, colors.accent_violet, 1,
-                                      LV_OPA_40, 20);
-    lv_obj_set_pos(halo2, WIDE_DASH_RIGHT_X + (WIDE_DASH_RIGHT_W - (WIDE_DASH_HALO_SIZE - 40)) / 2,
-                   wide_center_y(WIDE_DASH_HALO_SIZE - 40));
-    lv_obj_t *trophy = make_trophy_icon(root, TrophyKind::Platinum, WIDE_DASH_TROPHY_SIZE);
-    lv_obj_set_pos(trophy, WIDE_DASH_RIGHT_X + (WIDE_DASH_RIGHT_W - WIDE_DASH_TROPHY_SIZE) / 2,
-                   wide_center_y(WIDE_DASH_TROPHY_SIZE));
-
-    // PAS d'entree animee ni de pulsation continue ici (contrairement a
-    // l'ecran rond, voir widgets.hpp) : fade_in/float_in/pulse_obj rendaient
-    // le board 7" reellement saccade au premier flash materiel -- la
-    // pulsation en boucle infinie (pulse_obj, transform_scale a chaque
-    // frame) coutait particulierement cher sur ce panneau RGB 800x480 sans
-    // acceleration materielle du blending. Retour utilisateur du
-    // 2026-07-29 apres le tout premier flash reel ("zero animation ca fait
-    // tout ramer").
+    dashboard_metric_card(root, 332, 346, 132, world_rank, "Monde", colors.accent_violet);
+    dashboard_metric_card(root, 476, 346, 132, national_rank, "France", lv_color_hex(0x52C6FF));
+    dashboard_metric_card(root, 620, 346, 144, trophy_points, "Points", colors.gold);
 
     return root;
 }
 
-lv_obj_t *build_trophy_screen_wide(TrophyKind kind, int value, int sub_index, int sub_count, AppLanguage lang) {
+lv_obj_t *build_trophies_overview_screen_wide(const ProfileData &p, AppLanguage lang) {
+    lv_obj_t *root = wide_screen_root();
+    ambient_rings(root, colors.accent_cyan);
+    label(root, tr(lang, Str::kTrophiesTitle), &td_font_28, colors.text_primary, 48, 64, 260, LV_TEXT_ALIGN_LEFT);
+    label(root, lang == AppLanguage::kFrench ? "Répartition globale" : "Global split", &td_font_16,
+          colors.text_secondary, 50, 100, 260, LV_TEXT_ALIGN_LEFT);
+    wide_bg_rect(root, 50, 125, 198, 2, colors.accent_cyan, LV_OPA_COVER, colors.accent_cyan, LV_OPA_TRANSP, 0, 1);
+    dashboard_status_badge(root, p.updated.c_str());
+
+    lv_obj_t *total = wide_bg_rect(root, 580, 105, 148, 32, lv_color_hex(0x07111A), wide_opa_pct(78),
+                                   colors.accent_cyan, wide_opa_pct(28), 1, 16);
+    label(total, "Total", &td_font_10, colors.text_secondary, 20, 8, 42, LV_TEXT_ALIGN_LEFT);
+    const std::string total_text = format_number(p.total);
+    label(total, total_text.c_str(), &td_font_14, colors.text_primary, 60, 4, 66, LV_TEXT_ALIGN_RIGHT);
+
+    trophy_overview_row(root, TrophyKind::Platinum, p.platinum, p.total, 148, lang);
+    trophy_overview_row(root, TrophyKind::Gold, p.gold, p.total, 222, lang);
+    trophy_overview_row(root, TrophyKind::Silver, p.silver, p.total, 296, lang);
+    trophy_overview_row(root, TrophyKind::Bronze, p.bronze, p.total, 370, lang);
+
+    return root;
+}
+
+lv_obj_t *build_trophy_screen_wide(TrophyKind kind, int value, int total, int sub_index, int sub_count,
+                                   AppLanguage lang) {
     lv_obj_t *root = wide_screen_root();
     const lv_color_t accent = trophy_color_wide(kind);
+    const int share = trophy_percent_of_total_wide(value, total);
+    const std::string value_text = format_number(value);
+    const std::string share_text = trophy_share_sentence_wide(value, total);
     ambient_rings(root, accent);
 
-    // Texture de fond (tirets, glow, degrade violet/cyan) issue d'une planche
-    // IA -- volontairement SOUS l'anneau colore par palier (make_dual_ring
-    // ci-dessous, code) plutot qu'a sa place : recolorier cette image en teinte
-    // plate aurait fait perdre la distinction bronze/argent/or/platine
-    // (trophy_color_wide) -- retour utilisateur du 2026-07-28.
-    //
-    // Anneau recentre sur le TROPHEE (WIDE_HERO_TROPHY_HALO_Y/SIZE), pas sur
-    // l'atmosphere de fond generique (WIDE_HERO_HALO_Y/SIZE, ambient_rings
-    // ci-dessus, inchangee) -- voir audit du 2026-07-29 dans layout_wide.hpp.
-    constexpr int kRingAssetNativeSize = 340;
-    constexpr int kRingAssetScale =
-        static_cast<int>(256.0 * WIDE_HERO_TROPHY_HALO_SIZE / kRingAssetNativeSize + 0.5);
-    lv_obj_t *ring_bg = lv_image_create(root);
-    lv_image_set_src(ring_bg, trophy_ring_descriptor());
-    lv_image_set_scale(ring_bg, kRingAssetScale);
-    lv_obj_set_size(ring_bg, WIDE_HERO_TROPHY_HALO_SIZE, WIDE_HERO_TROPHY_HALO_SIZE);
-    lv_obj_set_pos(ring_bg, wide_center_x(WIDE_HERO_TROPHY_HALO_SIZE),
-                   WIDE_HERO_TROPHY_HALO_Y - WIDE_HERO_TROPHY_HALO_SIZE / 2);
+    label(root, trophy_kind_label(kind, lang), &td_font_28, colors.text_primary, 48, 56, 220, LV_TEXT_ALIGN_LEFT);
+    label(root, trophy_focus_label_wide(kind), &td_font_16, colors.text_secondary, 50, 90, 220, LV_TEXT_ALIGN_LEFT);
+    wide_bg_rect(root, 50, 116, 54, 2, accent, LV_OPA_COVER, accent, LV_OPA_TRANSP);
 
-    lv_obj_t *halo =
-        make_dual_ring(root, WIDE_HERO_TROPHY_HALO_SIZE, accent, colors.accent_violet, 3, LV_OPA_70);
-    lv_obj_set_pos(halo, wide_center_x(WIDE_HERO_TROPHY_HALO_SIZE),
-                   WIDE_HERO_TROPHY_HALO_Y - WIDE_HERO_TROPHY_HALO_SIZE / 2);
-    lv_obj_t *halo2 = make_dual_ring(root, WIDE_HERO_TROPHY_HALO_SIZE - 24, accent, colors.accent_violet, 1,
-                                      LV_OPA_40, 20);
-    lv_obj_set_pos(halo2, wide_center_x(WIDE_HERO_TROPHY_HALO_SIZE - 24),
-                   WIDE_HERO_TROPHY_HALO_Y - (WIDE_HERO_TROPHY_HALO_SIZE - 24) / 2);
-    add_slider_deco(root, wide_center_x(WIDE_HERO_TROPHY_HALO_SIZE) - 40, WIDE_HERO_TROPHY_HALO_Y - 13, accent);
-    add_slider_deco(root, wide_center_x(WIDE_HERO_TROPHY_HALO_SIZE) + WIDE_HERO_TROPHY_HALO_SIZE + 24,
-                     WIDE_HERO_TROPHY_HALO_Y - 13, colors.accent_violet);
+    constexpr int kCardX = 112;
+    constexpr int kCardY = 116;
+    constexpr int kCardW = 576;
+    constexpr int kCardH = 270;
+    lv_obj_t *main_card = card(root, kCardX, kCardY, kCardW, kCardH, 18, LV_OPA_80);
+    lv_obj_set_style_border_color(main_card, accent, 0);
+    lv_obj_set_style_border_opa(main_card, LV_OPA_60, 0);
 
-    lv_obj_t *trophy = make_trophy_icon(root, kind, WIDE_HERO_TROPHY_SIZE);
-    lv_obj_set_pos(trophy, wide_center_x(WIDE_HERO_TROPHY_SIZE), WIDE_HERO_TROPHY_TOP);
+    wide_bg_rect(root, kCardX + 44, kCardY + 2, kCardW - 88, 1, accent, wide_opa_pct(18), accent, LV_OPA_TRANSP);
 
-    lv_obj_t *value_lbl = label(root, format_number(value).c_str(), &td_font_96, colors.text_primary,
-                                 wide_center_x(WIDE_HERO_VALUE_W), WIDE_HERO_VALUE_Y, WIDE_HERO_VALUE_W);
-    lv_obj_t *caption_lbl = label(root, trophy_kind_label(kind, lang), &td_font_28,
-                                   colors.text_secondary, wide_center_x(WIDE_HERO_CAPTION_W), WIDE_HERO_CAPTION_Y,
-                                   WIDE_HERO_CAPTION_W);
+    constexpr int kTrophyCenterX = 266;
+    constexpr int kTrophyCenterY = 252;
+    lv_obj_t *halo = make_dual_ring(root, 210, accent, colors.accent_violet, 3, LV_OPA_70);
+    lv_obj_set_pos(halo, kTrophyCenterX - 105, kTrophyCenterY - 105);
+    lv_obj_t *halo2 = make_dual_ring(root, 182, accent, colors.accent_violet, 1, LV_OPA_40, 20);
+    lv_obj_set_pos(halo2, kTrophyCenterX - 91, kTrophyCenterY - 91);
+
+    lv_obj_t *glow = card(root, 174, 160, 184, 184, LV_RADIUS_CIRCLE, kind == TrophyKind::Platinum ? LV_OPA_20 : LV_OPA_10);
+    lv_obj_set_style_bg_color(glow, accent, 0);
+    lv_obj_set_style_border_width(glow, 0, 0);
+
+    lv_obj_t *trophy = make_trophy_icon(root, kind, 128);
+    lv_obj_set_pos(trophy, 200, 188);
+
+    label(root, trophy_kind_label(kind, lang), &td_font_18, colors.text_secondary, 416, 164, 150, LV_TEXT_ALIGN_LEFT);
+    label(root, value_text.c_str(), &td_font_48, accent, 416, 204, 190, LV_TEXT_ALIGN_LEFT);
+    label(root, "trophées", &td_font_16, colors.text_secondary, 416, 270, 170, LV_TEXT_ALIGN_LEFT);
+    wide_progress_bar(root, 416, 314, 208, 8, share, accent);
+    label(root, share_text.c_str(), &td_font_16, colors.text_secondary, 416, 338, 190, LV_TEXT_ALIGN_LEFT);
 
     lv_obj_t *dots = make_page_indicator(root, sub_index, sub_count);
     lv_obj_align(dots, LV_ALIGN_TOP_MID, 0, WIDE_HERO_DOTS_Y);
-
-    // Pas d'animation (entree ni pulsation continue) -- voir
-    // build_dashboard_screen_wide() ci-dessus, meme retour utilisateur du
-    // 2026-07-29 apres le premier flash reel.
 
     return root;
 }
@@ -389,58 +822,217 @@ lv_obj_t *build_credits_screen_wide(AppLanguage lang) {
     lv_obj_t *root = wide_screen_root();
     ambient_rings(root, colors.accent_cyan);
 
-    // Logo a 2x sa taille native (44x23 -> 88x46) : au-dela, le bitmap
-    // source devient visiblement flou -- la lisibilite de loin repose donc
-    // sur le texte "Pocket PSN" ci-dessous (grande police), pas sur le
-    // logo lui-meme. Centre verticalement sur la meme bande que le disque
-    // d'icone des ecrans Statistiques (WIDE_HERO_ICON_TOP + ICON_BOX/2) --
-    // meme cadence visuelle sur les 5 ecrans "hero".
-    constexpr int kLogoW = assets::kPocketPsnLogoWidth * 2;
-    constexpr int kLogoH = assets::kPocketPsnLogoHeight * 2;
-    constexpr int kLogoCenterY = WIDE_HERO_ICON_TOP + WIDE_HERO_ICON_BOX / 2;
+    label(root, tr(lang, Str::kAboutLabel), &td_font_28, colors.text_primary, 48, 64, 260, LV_TEXT_ALIGN_LEFT);
+    wide_bg_rect(root, 50, 125, 198, 2, colors.accent_cyan, LV_OPA_COVER, colors.accent_cyan, LV_OPA_TRANSP, 0, 1);
 
-    // Anneau recentre sur le LOGO (kLogoCenterY=150), pas sur l'atmosphere
-    // generique (WIDE_HERO_HALO_Y=210) -- meme bug/meme correction que les
-    // ecrans Trophees (voir WIDE_HERO_TROPHY_HALO_Y/SIZE, audit du
-    // 2026-07-29) : l'ancien anneau (centre 210) laissait le logo (centre
-    // 150) colle en haut et le texte "Pocket PSN" (y=268) chevauchait le
-    // bas de l'anneau. Taille 220 (legerement plus petite que les 230px
-    // des ecrans Trophees) : le logo est plus petit qu'un trophee, et le
-    // centre du logo (150) est plus bas que celui du trophee (146), moins
-    // de marge disponible avant le texte.
-    constexpr int kCreditsHaloY = kLogoCenterY;
-    constexpr int kCreditsHaloSize = 220;
-    constexpr int kRingAssetNativeSize = 340;
-    constexpr int kCreditsRingScale = static_cast<int>(256.0 * kCreditsHaloSize / kRingAssetNativeSize + 0.5);
-    lv_obj_t *ring_bg = lv_image_create(root);
-    lv_image_set_src(ring_bg, trophy_ring_descriptor());
-    lv_image_set_scale(ring_bg, kCreditsRingScale);
-    lv_obj_set_size(ring_bg, kCreditsHaloSize, kCreditsHaloSize);
-    lv_obj_set_pos(ring_bg, wide_center_x(kCreditsHaloSize), kCreditsHaloY - kCreditsHaloSize / 2);
+    constexpr int kCardX = 286;
+    constexpr int kCardY = 118;
+    constexpr int kCardW = 462;
+    constexpr int kCardH = 280;
+    lv_obj_t *panel = card(root, kCardX, kCardY, kCardW, kCardH, 16, LV_OPA_80);
+    lv_obj_set_style_border_color(panel, colors.accent_cyan, 0);
+    lv_obj_set_style_border_opa(panel, wide_opa_pct(48), 0);
+    wide_bg_rect(panel, 46, 18, kCardW - 92, 2, colors.accent_cyan, LV_OPA_COVER, colors.accent_cyan,
+                 LV_OPA_TRANSP, 0, 1);
 
-    lv_obj_t *halo = make_dual_ring(root, kCreditsHaloSize, colors.accent_cyan, colors.accent_violet, 3, LV_OPA_70);
-    lv_obj_set_pos(halo, wide_center_x(kCreditsHaloSize), kCreditsHaloY - kCreditsHaloSize / 2);
-    lv_obj_t *halo2 =
-        make_dual_ring(root, kCreditsHaloSize - 24, colors.accent_cyan, colors.accent_violet, 1, LV_OPA_40, 20);
-    lv_obj_set_pos(halo2, wide_center_x(kCreditsHaloSize - 24), kCreditsHaloY - (kCreditsHaloSize - 24) / 2);
-    add_slider_deco(root, wide_center_x(kCreditsHaloSize) - 40, kCreditsHaloY - 13, colors.accent_violet);
-    add_slider_deco(root, wide_center_x(kCreditsHaloSize) + kCreditsHaloSize + 24, kCreditsHaloY - 13,
-                     colors.accent_cyan);
+    label(panel, "Trophy Display", &td_font_28, colors.text_primary, 0, 54, kCardW, LV_TEXT_ALIGN_CENTER);
+    label(panel, "Version 1.0", &td_font_12, colors.text_secondary, 0, 90, kCardW, LV_TEXT_ALIGN_CENTER);
+    label(panel, lang == AppLanguage::kFrench ? "Données PlayStation fournies par" : "PlayStation data provided by",
+          &td_font_12, colors.text_muted, 0, 126, kCardW, LV_TEXT_ALIGN_CENTER);
 
-    lv_obj_t *logo = lv_image_create(root);
+    lv_obj_t *pocket = wide_bg_rect(panel, 116, 150, 230, 64, lv_color_hex(0x07111A), wide_opa_pct(92),
+                                    colors.accent_cyan, wide_opa_pct(55), 1, 8);
+    lv_obj_t *logo = lv_image_create(pocket);
     lv_image_set_src(logo, assets::pocketpsn_logo_descriptor());
-    lv_image_set_scale(logo, 512);
-    lv_obj_set_size(logo, kLogoW, kLogoH);
-    lv_obj_set_pos(logo, wide_center_x(kLogoW), kLogoCenterY - kLogoH / 2);
+    lv_image_set_scale(logo, 384);
+    lv_obj_set_size(logo, 66, 35);
+    lv_obj_set_pos(logo, 20, 15);
+    label(pocket, "Pocket PSN", &td_font_18, colors.text_primary, 96, 14, 112, LV_TEXT_ALIGN_LEFT);
+    label(pocket, "pocketpsn.com", &td_font_12, colors.accent_cyan, 96, 36, 112, LV_TEXT_ALIGN_LEFT);
 
-    lv_obj_t *name_lbl = label(root, "Pocket PSN", &td_font_48, colors.text_primary, wide_center_x(WIDE_HERO_VALUE_W),
-                                WIDE_HERO_VALUE_Y, WIDE_HERO_VALUE_W);
-    lv_obj_t *caption_lbl = label(root, tr(lang, Str::kCreditsDataProvidedBy), &td_font_28, colors.text_secondary,
-                                   wide_center_x(WIDE_HERO_CAPTION_W), WIDE_HERO_CAPTION_Y, WIDE_HERO_CAPTION_W);
-    lv_obj_t *credit_lbl = label(root, "Trophy Display -- Kevin Torres", &td_font_12, colors.text_muted,
-                                  wide_center_x(400), WIDE_HERO_DOTS_Y, 400);
+    label(panel, lang == AppLanguage::kFrench ? "Conception et développement" : "Design and development",
+          &td_font_10, colors.text_muted, 0, 232, kCardW, LV_TEXT_ALIGN_CENTER);
+    label(panel, "Kevin Torres", &td_font_12, colors.text_primary, 0, 248, kCardW, LV_TEXT_ALIGN_CENTER);
+    wide_bg_rect(panel, 46, 272, kCardW - 92, 1, colors.text_muted, LV_OPA_30, colors.text_muted, LV_OPA_TRANSP);
 
-    // Pas d'animation -- voir build_dashboard_screen_wide().
+    return root;
+}
+
+void stat_overview_tile(lv_obj_t *root, int x, int y, const char *icon, lv_color_t accent, const char *value,
+                         const char *caption) {
+    constexpr int kW = 216;
+    constexpr int kH = 108;
+    lv_obj_t *tile = card(root, x, y, kW, kH, 14, LV_OPA_80);
+    lv_obj_set_style_border_color(tile, accent, 0);
+    lv_obj_set_style_border_opa(tile, LV_OPA_70, 0);
+    lv_obj_set_style_border_width(tile, 1, 0);
+    wide_bg_rect(tile, 24, 16, kW - 48, 1, accent, LV_OPA_30, accent, LV_OPA_TRANSP);
+    wide_bg_rect(tile, 18, 24, 68, 68, accent, wide_opa_pct(7), accent, LV_OPA_TRANSP, 0, 34);
+    wide_icon_circle(tile, icon, 54, 58, 52, 34, accent);
+
+    constexpr int kTextX = 100;
+    constexpr int kTextW = kW - kTextX - 12;
+    const lv_font_t *value_font = std::strlen(value) >= 8 ? &td_font_20 : &td_font_24;
+    label(tile, value, value_font, colors.text_primary, kTextX, 30, kTextW, LV_TEXT_ALIGN_LEFT);
+    label(tile, caption, &td_font_14, colors.text_secondary, kTextX, 68, kTextW, LV_TEXT_ALIGN_LEFT);
+    wide_bg_rect(tile, kTextX, 94, 46, 3, accent, LV_OPA_80, accent, LV_OPA_TRANSP, 0, 2);
+}
+
+lv_obj_t *build_statistics_overview_screen_wide(const ProfileData &p, AppLanguage lang) {
+    lv_obj_t *root = wide_screen_root();
+    ambient_rings(root, colors.accent_violet);
+
+    label(root, "Statistiques", &td_font_28, colors.text_primary, 48, 64, 260, LV_TEXT_ALIGN_LEFT);
+    label(root, lang == AppLanguage::kFrench ? "Vue rapide du profil" : "Profile quick view", &td_font_16,
+          colors.text_secondary, 50, 100, 260, LV_TEXT_ALIGN_LEFT);
+    wide_bg_rect(root, 50, 125, 198, 2, colors.accent_cyan, LV_OPA_COVER, colors.accent_cyan, LV_OPA_TRANSP, 0, 1);
+    make_status_badge(root, p.updated.c_str(), colors.success, 650, 67);
+
+    char completion[16];
+    std::snprintf(completion, sizeof(completion), "%d %%", p.completion);
+    const std::string total = format_number(p.total);
+    const std::string completed = format_number(p.games_completed);
+    const std::string platinum = format_number(p.platinum);
+    const char *rank = p.world_rank.empty() ? "-" : p.world_rank.c_str();
+    const char *play_time = p.play_time.empty() ? "-" : p.play_time.c_str();
+
+    stat_overview_tile(root, 48, 146, "trophy-pro", colors.accent_cyan, total.c_str(),
+                       lang == AppLanguage::kFrench ? "trophées" : "trophies");
+    stat_overview_tile(root, 292, 146, "gamepad-pro", colors.success, completed.c_str(),
+                       lang == AppLanguage::kFrench ? "jeux terminés" : "games done");
+    stat_overview_tile(root, 536, 146, "percent-pro", colors.accent_violet, completion,
+                       lang == AppLanguage::kFrench ? "completion" : "completion");
+    stat_overview_tile(root, 48, 288, "seal-check-pro", colors.platinum, platinum.c_str(),
+                       lang == AppLanguage::kFrench ? "platine" : "platinum");
+    stat_overview_tile(root, 292, 288, "chart-no-axes-combined", colors.gold, rank,
+                       lang == AppLanguage::kFrench ? "rang mondial" : "world rank");
+    stat_overview_tile(root, 536, 288, "timer-pro", colors.bronze, play_time,
+                       lang == AppLanguage::kFrench ? "temps joué" : "play time");
+
+    return root;
+}
+
+lv_obj_t *build_sync_screen_wide(SyncState state, int progress, AppLanguage lang) {
+    lv_obj_t *root = wide_screen_root();
+    ambient_rings(root, colors.accent_cyan);
+
+    const int pct = sync_progress_wide(state, progress);
+    make_status_badge(root, state == SyncState::Done ? tr(lang, Str::kReady) : "en cours",
+                      state == SyncState::Error ? colors.warning : colors.success, 650, 67,
+                      state == SyncState::Done ? "badge-check" : "refresh-cw");
+    dashboard_xp_ring(root, 400, 198, 220, pct);
+    wide_icon_circle(root, state == SyncState::Done ? "badge-check" : "refresh-cw", 400, 198, 74, 42,
+                     state == SyncState::Error ? colors.warning : colors.accent_cyan);
+    label(root, sync_title_wide(state, lang), &td_font_28, colors.text_primary, 272, 320, 256,
+          LV_TEXT_ALIGN_CENTER);
+    label(root, sync_subtitle_wide(state, lang), &td_font_16, colors.text_secondary, 292, 356, 216,
+          LV_TEXT_ALIGN_CENTER);
+    wide_progress_bar(root, 326, 392, 148, 5, pct, state == SyncState::Error ? colors.warning : colors.accent_cyan);
+
+    char pct_text[16];
+    std::snprintf(pct_text, sizeof(pct_text), "%d %%", pct);
+    label(root, pct_text, &td_font_12, state == SyncState::Error ? colors.warning : colors.accent_cyan, 378, 405, 44,
+          LV_TEXT_ALIGN_CENTER);
+
+    const char *steps[] = {"Connexion", "Profil", "Données"};
+    const int active_step = pct >= 80 ? 2 : (pct >= 45 ? 1 : 0);
+    for(int i = 0; i < 3; ++i) {
+        const int x = 285 + i * 82;
+        const lv_color_t c = i == active_step ? colors.accent_cyan : colors.text_muted;
+        wide_bg_rect(root, x, 438, 5, 5, c, LV_OPA_COVER, c, LV_OPA_TRANSP, 0, LV_RADIUS_CIRCLE);
+        label(root, steps[i], &td_font_10, c, x + 10, 434, 64, LV_TEXT_ALIGN_LEFT);
+    }
+
+    return root;
+}
+
+lv_obj_t *build_offline_screen_wide(const ProfileData &p, AppLanguage lang) {
+    lv_obj_t *root = wide_screen_root();
+    const lv_color_t accent = lv_color_hex(0x52C6FF);
+    ambient_rings(root, accent);
+    wide_title_block(root, tr(lang, Str::kOffline), lang == AppLanguage::kFrench ? "Dernières données disponibles"
+                                                                                  : "Last data available",
+                     accent);
+
+    constexpr int kCardX = 102;
+    constexpr int kCardY = 158;
+    constexpr int kCardW = 596;
+    constexpr int kCardH = 184;
+    lv_obj_t *panel = card(root, kCardX, kCardY, kCardW, kCardH, 14, LV_OPA_80);
+    lv_obj_set_style_border_color(panel, accent, 0);
+    lv_obj_set_style_border_opa(panel, wide_opa_pct(55), 0);
+    wide_card_top_accent(root, kCardX, kCardY, kCardW, accent);
+    wide_icon_circle(root, "wifi-off", 196, 246, 84, 42, accent);
+
+    label(root, lang == AppLanguage::kFrench ? "Connexion absente" : "No connection", &td_font_24,
+          colors.text_primary, 276, 196, 306, LV_TEXT_ALIGN_LEFT);
+    const char *message = p.offline_message.empty()
+                              ? (lang == AppLanguage::kFrench ? "Le profil reste lisible avec la dernière sauvegarde."
+                                                               : "The profile remains readable from the last save.")
+                              : p.offline_message.c_str();
+    label(root, message, &td_font_16, colors.text_secondary, 278, 236, 396, LV_TEXT_ALIGN_LEFT);
+    label(root, lang == AppLanguage::kFrench ? "Nouvelle tentative possible depuis cet écran."
+                                             : "A new attempt is available from this screen.",
+          &td_font_12, colors.text_muted, 278, 264, 390, LV_TEXT_ALIGN_LEFT);
+    wide_state_button(root, 278, 288, accent, false);
+
+    return root;
+}
+
+lv_obj_t *build_error_screen_wide(const ProfileData &p, AppLanguage lang) {
+    lv_obj_t *root = wide_screen_root();
+    const lv_color_t accent = colors.warning;
+    ambient_rings(root, accent);
+    wide_title_block(root, tr(lang, Str::kErrorBadge),
+                     lang == AppLanguage::kFrench ? "Synchronisation interrompue" : "Sync interrupted", accent);
+
+    constexpr int kCardX = 102;
+    constexpr int kCardY = 158;
+    constexpr int kCardW = 596;
+    constexpr int kCardH = 184;
+    lv_obj_t *panel = card(root, kCardX, kCardY, kCardW, kCardH, 14, LV_OPA_80);
+    lv_obj_set_style_border_color(panel, accent, 0);
+    lv_obj_set_style_border_opa(panel, wide_opa_pct(45), 0);
+    wide_card_top_accent(root, kCardX, kCardY, kCardW, accent);
+    wide_icon_circle(root, "triangle-alert", 196, 246, 84, 42, accent);
+
+    const char *title = p.error_title.empty()
+                            ? (lang == AppLanguage::kFrench ? "Profil indisponible" : "Profile unavailable")
+                            : p.error_title.c_str();
+    const char *message = p.error_message.empty()
+                              ? (lang == AppLanguage::kFrench ? "La réponse Pocket PSN n'est pas exploitable."
+                                                               : "Pocket PSN response cannot be used.")
+                              : p.error_message.c_str();
+    label(root, title, &td_font_24, colors.text_primary, 276, 196, 306, LV_TEXT_ALIGN_LEFT);
+    label(root, message, &td_font_16, colors.text_secondary, 278, 236, 396, LV_TEXT_ALIGN_LEFT);
+    label(root, lang == AppLanguage::kFrench ? "Les anciennes données restent affichées."
+                                             : "Previous data remains displayed.",
+          &td_font_12, colors.text_muted, 278, 264, 390, LV_TEXT_ALIGN_LEFT);
+    wide_state_button(root, 278, 288, accent, true);
+
+    return root;
+}
+
+lv_obj_t *build_settings_screen_wide(const ProfileData &p, AppLanguage lang) {
+    lv_obj_t *root = wide_screen_root();
+    ambient_rings(root, colors.accent_cyan);
+    label(root, tr(lang, Str::kSettingsTitle), &td_font_28, colors.text_primary, 112, 64, 210, LV_TEXT_ALIGN_LEFT);
+    label(root, lang == AppLanguage::kFrench ? "Contrôles rapides" : "Quick controls", &td_font_16,
+          colors.text_secondary, 114, 100, 250, LV_TEXT_ALIGN_LEFT);
+    wide_bg_rect(root, 114, 125, 198, 2, colors.accent_cyan, LV_OPA_COVER, colors.accent_cyan, LV_OPA_TRANSP, 0, 1);
+    make_status_badge(root, p.updated.c_str(), colors.success, 650, 67);
+
+    char brightness[16];
+    std::snprintf(brightness, sizeof(brightness), "%d %%", std::clamp(p.brightness, 0, 100));
+    settings_row_wide(root, 133, "sun", tr(lang, Str::kBrightnessLabel), brightness, colors.accent_cyan,
+                      std::clamp(p.brightness, 0, 100));
+    settings_row_wide(root, 186, "rotate-ccw", "Rotation auto", "ON", lv_color_hex(0x52C6FF), -1, true);
+    settings_row_wide(root, 239, "sparkles", "Animations", p.reduced_motion ? "OFF" : "ON", colors.accent_violet,
+                      -1, !p.reduced_motion);
+    settings_row_wide(root, 292, "refresh-cw", tr(lang, Str::kRefreshLabel), "30 min", colors.gold);
+    settings_row_wide(root, 345, "gamepad-pro", tr(lang, Str::kProfileLabel),
+                      p.username.empty() ? "-" : p.username.c_str(), colors.success);
+    settings_row_wide(root, 398, "info", tr(lang, Str::kAboutLabel), "Version 1.0", colors.text_secondary);
 
     return root;
 }
@@ -573,7 +1165,7 @@ lv_obj_t *build_wifi_setup_screen_wide(const std::string &ssid, const std::strin
     char fallback[96];
     std::snprintf(fallback, sizeof(fallback), tr(lang, Str::kWifiSetupFallbackFormat), ip_address.c_str());
     lv_obj_t *fallback_lbl = label(root, fallback, &td_font_14, colors.text_muted, wide_center_x(WIDE_HERO_VALUE_W),
-                                    kPillY + kPillH + 68, WIDE_HERO_VALUE_W);
+                                    kPillY + kPillH + 78, WIDE_HERO_VALUE_W);
 
     // Pas d'animation -- voir build_dashboard_screen_wide().
 
@@ -607,8 +1199,7 @@ lv_obj_t *build_dashboard_screen_wide_v2(const ProfileData &p, AppLanguage lang)
     lv_obj_set_style_border_color(avatar, colors.text_muted, 0);
     lv_obj_set_style_border_opa(avatar, LV_OPA_60, 0);
     lv_obj_set_pos(avatar, 40, 40);
-    lv_obj_t *avatar_icon = make_icon_box(avatar, "circle-user-round", 32, 20, colors.text_secondary);
-    lv_obj_center(avatar_icon);
+    add_profile_avatar_content(avatar, p, 56, 32, 20, colors.text_secondary);
 
     label(root, p.username.c_str(), &td_font_22, colors.text_primary, 108, 46, 300, LV_TEXT_ALIGN_LEFT);
     label(root, p.updated.c_str(), &td_font_12, colors.text_muted, 108, 74, 300, LV_TEXT_ALIGN_LEFT);
