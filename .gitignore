@@ -27,3 +27,15 @@ include/secrets.h
 # interne uniquement.
 !webinstall/firmware/*.bin
 !webinstall_7inch/firmware/*.bin
+
+# LVGL 9.5.0 vendorise pour le simulateur : seul src/ est compile (voir le
+# glob de simulator/CMakeLists.txt) et seuls les en-tetes de la racine sont
+# inclus. Le reste de la release amont -- tests (70 Mo), demos (30 Mo),
+# scripts (19 Mo), docs (13 Mo), exemples (11 Mo) -- n'a aucune raison
+# d'entrer dans le depot : cela ferait passer le clone de 26 Mo a 267 Mo.
+simulator/third_party/lvgl-9.5.0/*
+!simulator/third_party/lvgl-9.5.0/src/
+!simulator/third_party/lvgl-9.5.0/lvgl.h
+!simulator/third_party/lvgl-9.5.0/lvgl_private.h
+!simulator/third_party/lvgl-9.5.0/lv_version.h
+!simulator/third_party/lvgl-9.5.0/LICENCE.txt
