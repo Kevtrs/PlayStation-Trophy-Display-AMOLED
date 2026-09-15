@@ -33,6 +33,15 @@ lv_obj_t *build_stat_screen_wide(StatIconKind icon_kind, const char *value, cons
 // Retour utilisateur du 2026-07-28.
 lv_obj_t *build_credits_screen_wide(AppLanguage lang);
 
+// Ecran de celebration : affiche apres une synchro qui a rapporte au
+// moins un trophee (voir TrophyDelta / UiBridge::showTrophyDelta). Prend
+// les gains, pas les totaux -- "gained.total" est le nombre de nouveaux
+// trophees, pas la collection.
+//
+// Ne prend volontairement aucun type de la couche data : TrophyStats est
+// le type UI (ui_model.hpp), le bridge fait la conversion.
+lv_obj_t *build_celebration_screen_wide(const TrophyStats &gained, AppLanguage lang);
+
 // --- Couche de navigation tactile (board 7", GT911) -------------------
 //
 // Le defilement automatique reste le mode par defaut : l'appareil est un

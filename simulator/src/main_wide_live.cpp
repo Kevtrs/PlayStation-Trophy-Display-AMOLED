@@ -76,6 +76,22 @@ lv_obj_t* buildForcedScreen(const std::string& screenName) {
   if (screenName == "error") return trophy::build_error_screen_wide(p, AppLanguage::kFrench);
   if (screenName == "settings") return trophy::build_settings_screen_wide(p, AppLanguage::kFrench);
   if (screenName == "about") return trophy::build_credits_screen_wide(AppLanguage::kFrench);
+  // Deux cas de celebration : un seul palier (le plus courant) et
+  // plusieurs paliers d'un coup (affiche le detail par palier).
+  if (screenName == "celebration") {
+    trophy::TrophyStats gained;
+    gained.total = 1;
+    gained.platinum = 1;
+    return trophy::build_celebration_screen_wide(gained, AppLanguage::kFrench);
+  }
+  if (screenName == "celebration-multi") {
+    trophy::TrophyStats gained;
+    gained.total = 7;
+    gained.gold = 1;
+    gained.silver = 2;
+    gained.bronze = 4;
+    return trophy::build_celebration_screen_wide(gained, AppLanguage::kFrench);
+  }
   // Valeurs du point d'acces de secours reellement diffuse par WiFiManager
   // (kApSsid + softAPIP), pas celles du dernier reseau tente.
   if (screenName == "wifi") {

@@ -85,6 +85,7 @@ class WideUiBridge : public UiBridge {
     kSync,
     kOffline,
     kError,
+    kCelebration,
   };
   void showStateScreen(lv_obj_t* next, StateScreenKind kind);
   void clearStateScreen();
@@ -119,10 +120,11 @@ class WideUiBridge : public UiBridge {
 
   // Tant qu'aucun Wi-Fi/compte n'est configure (WifiState::kAccessPoint,
   // voir AppController::tick()), l'ecran de connexion (build_wifi_setup_
-  // screen_wide) remplace ENTIEREMENT le defilement normal -- ce board n'a
-  // pas de tactile, un utilisateur non-technique doit voir cette info et
-  // seulement elle, pas des trophees de demo qui donneraient l'impression
-  // que c'est deja configure. Retour utilisateur du 2026-07-29.
+  // screen_wide) remplace ENTIEREMENT le defilement normal : un
+  // utilisateur non-technique doit voir cette info et seulement elle, pas
+  // des trophees de demo qui donneraient l'impression que c'est deja
+  // configure. Cet ecran ne recoit donc aucune couche de navigation, meme
+  // depuis l'ajout du tactile. Retour utilisateur du 2026-07-29.
   NetworkStatus network_;
   bool showingSetup_ = false;
 

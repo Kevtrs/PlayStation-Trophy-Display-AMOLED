@@ -62,6 +62,7 @@ constexpr Entry kEntries[] = {
                                             "Data stays readable during the update."},
 
     /* kNewTrophyTitle */                 {"Nouveau trophée", "New trophy"},
+    /* kNewTrophiesTitle */               {"Nouveaux trophées", "New trophies"},
     /* kMultipleTrophiesFormat */         {"+%u trophées", "+%u trophies"},
     /* kTapToReturn */                    {"Touchez pour revenir", "Tap to go back"},
 

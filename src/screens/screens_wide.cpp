@@ -1464,6 +1464,81 @@ lv_obj_t *build_stat_screen_wide_v3(StatIconKind icon_kind, const char *value, c
     return root;
 }
 
+lv_obj_t *build_celebration_screen_wide(const TrophyStats &gained, AppLanguage lang) {
+    // Palier mis en avant : le plus prestigieux parmi ceux reellement
+    // gagnes. Quand on decroche un Platine et trois Bronze dans la meme
+    // synchro, l'evenement c'est le Platine.
+    TrophyKind hero = TrophyKind::Bronze;
+    if(gained.platinum > 0) hero = TrophyKind::Platinum;
+    else if(gained.gold > 0) hero = TrophyKind::Gold;
+    else if(gained.silver > 0) hero = TrophyKind::Silver;
+
+    const int tiers = (gained.platinum > 0) + (gained.gold > 0) + (gained.silver > 0) + (gained.bronze > 0);
+    const int total = std::max(1, gained.total);
+    const lv_color_t accent = trophy_color_wide(hero);
+
+    lv_obj_t *root = wide_screen_root();
+    ambient_rings(root, accent);
+
+    // Composition centree, volontairement differente des ecrans de
+    // donnees : ici il n'y a rien a lire ni a comparer, juste un moment.
+    constexpr int kCx = WIDE_WIDTH / 2;
+    constexpr int kCy = 170;
+    constexpr int kTrophy = 160;
+    lv_obj_t *halo = make_dual_ring(root, 258, accent, colors.accent_violet, 3, LV_OPA_70);
+    lv_obj_set_pos(halo, kCx - 129, kCy - 129);
+    lv_obj_t *halo2 = make_dual_ring(root, 224, accent, colors.accent_violet, 1, LV_OPA_40, 20);
+    lv_obj_set_pos(halo2, kCx - 112, kCy - 112);
+    lv_obj_t *trophy = make_trophy_icon(root, hero, kTrophy);
+    lv_obj_set_pos(trophy, kCx - kTrophy / 2, kCy - kTrophy / 2);
+
+    // Accord singulier/pluriel : "Nouveau trophee" au-dessus de "+7
+    // trophees" ferait faute.
+    label(root, tr(lang, total > 1 ? Str::kNewTrophiesTitle : Str::kNewTrophyTitle), &td_font_28,
+          colors.text_primary, wide_center_x(WIDE_HERO_VALUE_W), 306, WIDE_HERO_VALUE_W);
+
+    char gain[64];
+    if(tiers > 1) {
+        std::snprintf(gain, sizeof(gain), tr(lang, Str::kMultipleTrophiesFormat), static_cast<unsigned>(total));
+    } else {
+        std::snprintf(gain, sizeof(gain), "+%d %s", total, trophy_kind_label(hero, lang));
+    }
+    label(root, gain, &td_font_48, accent, wide_center_x(WIDE_HERO_VALUE_W), 344, WIDE_HERO_VALUE_W);
+
+    // Detail par palier uniquement s'il y en a plusieurs : avec un seul,
+    // il repeterait mot pour mot la ligne au-dessus.
+    if(tiers > 1) {
+        struct Entry {
+            TrophyKind kind;
+            int count;
+        };
+        const Entry entries[] = {
+            {TrophyKind::Platinum, gained.platinum},
+            {TrophyKind::Gold, gained.gold},
+            {TrophyKind::Silver, gained.silver},
+            {TrophyKind::Bronze, gained.bronze},
+        };
+        constexpr int kChipW = 150;
+        constexpr int kChipH = 40;
+        constexpr int kChipGap = 12;
+        int x = (WIDE_WIDTH - (tiers * kChipW + (tiers - 1) * kChipGap)) / 2;
+        for(const Entry &e : entries) {
+            if(e.count <= 0) continue;
+            const lv_color_t chip_color = trophy_color_wide(e.kind);
+            lv_obj_t *chip = card(root, x, 418, kChipW, kChipH, kChipH / 2, LV_OPA_70);
+            lv_obj_set_style_border_color(chip, chip_color, 0);
+            lv_obj_set_style_border_opa(chip, wide_opa_pct(55), 0);
+            lv_obj_set_style_border_width(chip, 1, 0);
+            char txt[32];
+            std::snprintf(txt, sizeof(txt), "%s +%d", trophy_kind_label(e.kind, lang), e.count);
+            label(chip, txt, &td_font_16, chip_color, 0, (kChipH - 20) / 2, kChipW, LV_TEXT_ALIGN_CENTER);
+            x += kChipW + kChipGap;
+        }
+    }
+
+    return root;
+}
+
 // --- Couche de navigation tactile -------------------------------------
 
 namespace {

@@ -21,6 +21,11 @@ constexpr int kSlideCount = 8;
 // la vitrine qu'il est censee etre.
 constexpr uint32_t kIdleResumeMs = 20000;
 
+// La celebration reste un peu plus longtemps que les ecrans d'etat : elle
+// interrompt le defilement pour une bonne nouvelle, autant laisser le
+// temps de lever les yeux.
+constexpr uint32_t kCelebrationMs = 10000;
+
 // Un swipe peut produire plusieurs evenements de geste consecutifs, et
 // chaque navigation reconstruit un ecran entier : sans ce garde-fou, un
 // geste un peu appuye saute deux ou trois slides d'un coup.
@@ -106,8 +111,25 @@ void WideUiBridge::showSyncState(SyncState state) {
   }
 }
 
-void WideUiBridge::showTrophyDelta(const TrophyDelta& /*delta*/) {
-  // Pas d'ecran de celebration dedie cote large pour l'instant.
+void WideUiBridge::showTrophyDelta(const TrophyDelta& delta) {
+  // Rien a feter pendant la configuration initiale ni avant le premier
+  // ecran : l'appareil n'a pas encore d'historique auquel comparer.
+  if (!began_ || showingSetup_) return;
+  if (!delta.hasNewTrophy()) return;
+
+  // TrophyDelta appartient a la couche data, les ecrans n'en connaissent
+  // rien : on convertit en TrophyStats (type UI) ou chaque champ porte un
+  // GAIN et non un total.
+  trophy::TrophyStats gained;
+  gained.total = delta.totalDelta;
+  gained.platinum = delta.platinumDelta;
+  gained.gold = delta.goldDelta;
+  gained.silver = delta.silverDelta;
+  gained.bronze = delta.bronzeDelta;
+
+  Logger::info("[UI 7\"] Nouveau(x) trophee(s) : +%d (P%d O%d A%d B%d)", delta.totalDelta, delta.platinumDelta,
+               delta.goldDelta, delta.silverDelta, delta.bronzeDelta);
+  showStateScreen(trophy::build_celebration_screen_wide(gained, language_), StateScreenKind::kCelebration);
 }
 
 void WideUiBridge::showError(const AppError& error) {
@@ -447,8 +469,10 @@ void WideUiBridge::tick(uint32_t nowMillis) {
   if (showingStateScreen_) {
     const bool canAutoDismiss =
         stateScreenKind_ == StateScreenKind::kSync || stateScreenKind_ == StateScreenKind::kError ||
-        stateScreenKind_ == StateScreenKind::kOffline;
-    if (canAutoDismiss && nowMillis - lastSlideMs_ >= kStateScreenMs) {
+        stateScreenKind_ == StateScreenKind::kOffline || stateScreenKind_ == StateScreenKind::kCelebration;
+    const uint32_t dwellMs =
+        stateScreenKind_ == StateScreenKind::kCelebration ? kCelebrationMs : kStateScreenMs;
+    if (canAutoDismiss && nowMillis - lastSlideMs_ >= dwellMs) {
       if (stateScreenKind_ == StateScreenKind::kSync) {
         syncStateDismissed_ = true;
         dismissedSyncState_ = lastRawSyncState_;

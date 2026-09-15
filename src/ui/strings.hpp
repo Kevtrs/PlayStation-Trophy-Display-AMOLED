@@ -71,6 +71,7 @@ enum class Str {
 
     // Celebration.
     kNewTrophyTitle,
+    kNewTrophiesTitle, // pluriel : plusieurs trophees dans la meme synchro
     kMultipleTrophiesFormat,
     kTapToReturn,
 
