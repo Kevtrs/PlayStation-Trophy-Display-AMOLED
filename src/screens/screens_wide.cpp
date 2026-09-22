@@ -1464,7 +1464,57 @@ lv_obj_t *build_stat_screen_wide_v3(StatIconKind icon_kind, const char *value, c
     return root;
 }
 
-lv_obj_t *build_celebration_screen_wide(const TrophyStats &gained, AppLanguage lang) {
+namespace {
+
+// Echelle LVGL : 256 = taille reelle. Le pivot par defaut etant le coin
+// haut-gauche, il faut le recentrer, sinon l'objet grandit en glissant
+// vers le bas-droite au lieu de s'epanouir sur place (c'est le defaut du
+// pulse_obj partage, acceptable pour un battement discret, pas pour une
+// entree).
+void celebration_pop_in(lv_obj_t *obj, int size, uint32_t delay, uint32_t duration = 520) {
+    lv_obj_set_style_transform_pivot_x(obj, size / 2, 0);
+    lv_obj_set_style_transform_pivot_y(obj, size / 2, 0);
+    lv_obj_set_style_transform_scale_x(obj, 0, 0);
+    lv_obj_set_style_transform_scale_y(obj, 0, 0);
+
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, obj);
+    lv_anim_set_values(&a, 0, 256);
+    lv_anim_set_delay(&a, delay);
+    lv_anim_set_duration(&a, duration);
+    // Depassement volontaire : l'objet franchit sa taille finale puis
+    // revient. C'est ce petit rebond qui fait la difference entre "ca
+    // apparait" et "ca arrive".
+    lv_anim_set_path_cb(&a, lv_anim_path_overshoot);
+    lv_anim_set_exec_cb(&a, [](void *target, int32_t v) {
+        lv_obj_set_style_transform_scale_x(static_cast<lv_obj_t *>(target), v, 0);
+        lv_obj_set_style_transform_scale_y(static_cast<lv_obj_t *>(target), v, 0);
+    });
+    lv_anim_start(&a);
+}
+
+// Rotation lente et continue. Empeche l'ecran de retomber en photo une
+// fois l'entree jouee : il reste 10 secondes a l'affichage.
+void celebration_spin(lv_obj_t *obj, int size, uint32_t period_ms, bool reverse) {
+    lv_obj_set_style_transform_pivot_x(obj, size / 2, 0);
+    lv_obj_set_style_transform_pivot_y(obj, size / 2, 0);
+
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, obj);
+    lv_anim_set_values(&a, reverse ? 3600 : 0, reverse ? 0 : 3600);
+    lv_anim_set_duration(&a, period_ms);
+    lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_set_exec_cb(&a, [](void *target, int32_t v) {
+        lv_obj_set_style_transform_rotation(static_cast<lv_obj_t *>(target), v, 0);
+    });
+    lv_anim_start(&a);
+}
+
+} // namespace
+
+lv_obj_t *build_celebration_screen_wide(const TrophyStats &gained, AppLanguage lang, bool animate) {
     // Palier mis en avant : le plus prestigieux parmi ceux reellement
     // gagnes. Quand on decroche un Platine et trois Bronze dans la meme
     // synchro, l'evenement c'est le Platine.
@@ -1492,10 +1542,39 @@ lv_obj_t *build_celebration_screen_wide(const TrophyStats &gained, AppLanguage l
     lv_obj_t *trophy = make_trophy_icon(root, hero, kTrophy);
     lv_obj_set_pos(trophy, kCx - kTrophy / 2, kCy - kTrophy / 2);
 
+    if(animate) {
+        // Cascade : les anneaux s'ouvrent, le trophee arrive dessus avec
+        // un rebond, puis le texte monte. L'ordre et les decalages font
+        // tout -- joues ensemble, les trois lectures se marchent dessus.
+        // Les anneaux sont des groupes de 28 arcs vectoriels : un scale
+        // dessus obligerait LVGL a rasteriser puis transformer toute la
+        // zone a chaque image. Ils entrent donc en fondu, ce qui ne
+        // touche que l'alpha. Seul le trophee, qui est une image, recoit
+        // un scale : c'est natif et bon marche.
+        fade_in(halo, 0, 420);
+        fade_in(halo2, 90, 420);
+        celebration_pop_in(trophy, kTrophy, 200, 560);
+        // Les deux anneaux tournent en sens inverse, a des vitesses
+        // differentes : un seul anneau qui tourne se lit comme un
+        // chargement, deux qui se croisent se lisent comme une mise en
+        // valeur.
+        // Faire tourner les anneaux etait la piste initiale : abandonnee,
+        // meme cause que ci-dessus. Une rotation de ces groupes d'arcs
+        // rendait le simulateur inutilisable (plusieurs secondes par
+        // image, mesure) -- sur l'ESP32-S3 c'aurait ete pire encore.
+        //
+        // L'ecran garde donc sa vie par un battement lent du trophee, la
+        // meme technique que la celebration de l'ecran rond, deja
+        // eprouvee : un scale sur une image, ca LVGL sait faire. Le pivot
+        // a deja ete recentre par celebration_pop_in juste au-dessus.
+        pulse_obj(trophy, 820);
+    }
+
     // Accord singulier/pluriel : "Nouveau trophee" au-dessus de "+7
     // trophees" ferait faute.
-    label(root, tr(lang, total > 1 ? Str::kNewTrophiesTitle : Str::kNewTrophyTitle), &td_font_28,
-          colors.text_primary, wide_center_x(WIDE_HERO_VALUE_W), 306, WIDE_HERO_VALUE_W);
+    lv_obj_t *title = label(root, tr(lang, total > 1 ? Str::kNewTrophiesTitle : Str::kNewTrophyTitle), &td_font_28,
+                            colors.text_primary, wide_center_x(WIDE_HERO_VALUE_W), 306, WIDE_HERO_VALUE_W);
+    if(animate) float_in(title, 420, 14);
 
     char gain[64];
     if(tiers > 1) {
@@ -1503,7 +1582,9 @@ lv_obj_t *build_celebration_screen_wide(const TrophyStats &gained, AppLanguage l
     } else {
         std::snprintf(gain, sizeof(gain), "+%d %s", total, trophy_kind_label(hero, lang));
     }
-    label(root, gain, &td_font_48, accent, wide_center_x(WIDE_HERO_VALUE_W), 344, WIDE_HERO_VALUE_W);
+    lv_obj_t *gain_lbl =
+        label(root, gain, &td_font_48, accent, wide_center_x(WIDE_HERO_VALUE_W), 344, WIDE_HERO_VALUE_W);
+    if(animate) float_in(gain_lbl, 520, 18);
 
     // Detail par palier uniquement s'il y en a plusieurs : avec un seul,
     // il repeterait mot pour mot la ligne au-dessus.
@@ -1522,6 +1603,7 @@ lv_obj_t *build_celebration_screen_wide(const TrophyStats &gained, AppLanguage l
         constexpr int kChipH = 40;
         constexpr int kChipGap = 12;
         int x = (WIDE_WIDTH - (tiers * kChipW + (tiers - 1) * kChipGap)) / 2;
+        int shown = 0;
         for(const Entry &e : entries) {
             if(e.count <= 0) continue;
             const lv_color_t chip_color = trophy_color_wide(e.kind);
@@ -1532,6 +1614,8 @@ lv_obj_t *build_celebration_screen_wide(const TrophyStats &gained, AppLanguage l
             char txt[32];
             std::snprintf(txt, sizeof(txt), "%s +%d", trophy_kind_label(e.kind, lang), e.count);
             label(chip, txt, &td_font_16, chip_color, 0, (kChipH - 20) / 2, kChipW, LV_TEXT_ALIGN_CENTER);
+            if(animate) float_in(chip, 640 + shown * 90, 12);
+            ++shown;
             x += kChipW + kChipGap;
         }
     }

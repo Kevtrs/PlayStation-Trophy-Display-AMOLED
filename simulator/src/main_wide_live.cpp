@@ -82,7 +82,7 @@ lv_obj_t* buildForcedScreen(const std::string& screenName) {
     trophy::TrophyStats gained;
     gained.total = 1;
     gained.platinum = 1;
-    return trophy::build_celebration_screen_wide(gained, AppLanguage::kFrench);
+    return trophy::build_celebration_screen_wide(gained, AppLanguage::kFrench, true);
   }
   if (screenName == "celebration-multi") {
     trophy::TrophyStats gained;
@@ -90,7 +90,7 @@ lv_obj_t* buildForcedScreen(const std::string& screenName) {
     gained.gold = 1;
     gained.silver = 2;
     gained.bronze = 4;
-    return trophy::build_celebration_screen_wide(gained, AppLanguage::kFrench);
+    return trophy::build_celebration_screen_wide(gained, AppLanguage::kFrench, true);
   }
   // Valeurs du point d'acces de secours reellement diffuse par WiFiManager
   // (kApSsid + softAPIP), pas celles du dernier reseau tente.
@@ -125,6 +125,8 @@ int main(int argc, char** argv) {
   int exportAfterMs = 15000;  // assez pour depasser plusieurs cycles de 3s
   std::string exportPath = "simulator_wide_screenshots/live_after_cycle.png";
   std::string forcedScreen;
+  int burstCount = 0;
+  int burstIntervalMs = 100;
   for (int i = 1; i < argc; ++i) {
     if (std::string(argv[i]) == "--export-screenshot") exportOnly = true;
     // Permet de capturer un slide precis (voir kSlideMs/loadSlide() dans
@@ -133,6 +135,12 @@ int main(int argc, char** argv) {
     if (std::string(argv[i]) == "--export-at-ms" && i + 1 < argc) exportAfterMs = std::atoi(argv[++i]);
     if (std::string(argv[i]) == "--export-path" && i + 1 < argc) exportPath = argv[++i];
     if (std::string(argv[i]) == "--screen" && i + 1 < argc) forcedScreen = argv[++i];
+    // --burst N@MS : capture N images espacees de MS, a partir de
+    // --export-at-ms. Sert a montrer une animation autrement qu'en la
+    // decrivant : les fichiers sont numerotes <export-path>-000.png, etc.
+    if (std::string(argv[i]) == "--burst" && i + 1 < argc) {
+      if (std::sscanf(argv[++i], "%d@%d", &burstCount, &burstIntervalMs) != 2) burstCount = 0;
+    }
     // --tap X,Y@MS : rejoue un appui a la position X,Y, MS millisecondes
     // apres le demarrage. Permet de verifier la couche tactile (pause du
     // defilement, fleches, points, engrenage) de facon reproductible et
@@ -200,17 +208,38 @@ int main(int argc, char** argv) {
       return 2;
     }
     lv_scr_load(forced);
-    for (int i = 0; i < 6; ++i) {
-      lv_tick_inc(16);
-      lv_timer_handler();
-      DisplayDriverSdlWide::present(renderer);
-      SDL_Delay(16);
-    }
     std::error_code mkEc;
     std::filesystem::path outPath(exportPath);
     std::filesystem::create_directories(outPath.parent_path(), mkEc);
-    DisplayDriverSdlWide::saveScreenshotPng(exportPath.c_str());
-    std::printf("[live] Capture ecran %s : %s\n", forcedScreen.c_str(), exportPath.c_str());
+
+    if (burstCount > 0) {
+      // Temps LVGL avance a la main plutot que pris au chronometre : les
+      // images sont exactement espacees de burstIntervalMs quelle que
+      // soit la vitesse de la machine, et la sequence est reproductible.
+      for (int shot = 0; shot < burstCount; ++shot) {
+        for (int t = 0; t < burstIntervalMs; t += 16) {
+          lv_tick_inc(16);
+          lv_timer_handler();
+        }
+        DisplayDriverSdlWide::present(renderer);
+        std::filesystem::path stem = outPath;
+        stem.replace_extension("");
+        char name[512];
+        std::snprintf(name, sizeof(name), "%s-%03d.png", stem.string().c_str(), shot);
+        DisplayDriverSdlWide::saveScreenshotPng(name);
+      }
+      std::printf("[live] Sequence %s : %d images espacees de %d ms\n", forcedScreen.c_str(), burstCount,
+                  burstIntervalMs);
+    } else {
+      for (int i = 0; i < 6; ++i) {
+        lv_tick_inc(16);
+        lv_timer_handler();
+        DisplayDriverSdlWide::present(renderer);
+        SDL_Delay(16);
+      }
+      DisplayDriverSdlWide::saveScreenshotPng(exportPath.c_str());
+      std::printf("[live] Capture ecran %s : %s\n", forcedScreen.c_str(), exportPath.c_str());
+    }
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
@@ -244,6 +273,7 @@ int main(int argc, char** argv) {
   bool running = true;
   Uint32 startMs = SDL_GetTicks();
   Uint32 lastLogMs = 0;
+  int burstShot = 0;
   while (running) {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
@@ -306,6 +336,24 @@ int main(int argc, char** argv) {
     lv_timer_handler();
     DisplayDriverSdlWide::present(renderer);
 
+    if (exportOnly && burstCount > 0) {
+      const int elapsed = static_cast<int>(nowMillis - startMs);
+      if (elapsed >= exportAfterMs + burstShot * burstIntervalMs && burstShot < burstCount) {
+        std::error_code mkEc;
+        std::filesystem::path base(exportPath);
+        std::filesystem::create_directories(base.parent_path(), mkEc);
+        char numbered[512];
+        std::snprintf(numbered, sizeof(numbered), "%s-%03d.png",
+                      base.replace_extension("").string().c_str(), burstShot);
+        DisplayDriverSdlWide::saveScreenshotPng(numbered);
+        ++burstShot;
+        if (burstShot >= burstCount) {
+          std::printf("[live] Rafale terminee : %d images\n", burstCount);
+          running = false;
+        }
+      }
+      continue;
+    }
     if (exportOnly && static_cast<int>(nowMillis - startMs) >= exportAfterMs) {
       std::error_code mkEc;
       std::filesystem::path outPath(exportPath);

@@ -129,7 +129,8 @@ void WideUiBridge::showTrophyDelta(const TrophyDelta& delta) {
 
   Logger::info("[UI 7\"] Nouveau(x) trophee(s) : +%d (P%d O%d A%d B%d)", delta.totalDelta, delta.platinumDelta,
                delta.goldDelta, delta.silverDelta, delta.bronzeDelta);
-  showStateScreen(trophy::build_celebration_screen_wide(gained, language_), StateScreenKind::kCelebration);
+  showStateScreen(trophy::build_celebration_screen_wide(gained, language_, !profile_.reduced_motion),
+                  StateScreenKind::kCelebration);
 }
 
 void WideUiBridge::showError(const AppError& error) {

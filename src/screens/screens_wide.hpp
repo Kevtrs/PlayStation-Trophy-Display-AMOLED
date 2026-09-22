@@ -40,7 +40,9 @@ lv_obj_t *build_credits_screen_wide(AppLanguage lang);
 //
 // Ne prend volontairement aucun type de la couche data : TrophyStats est
 // le type UI (ui_model.hpp), le bridge fait la conversion.
-lv_obj_t *build_celebration_screen_wide(const TrophyStats &gained, AppLanguage lang);
+// animate : false quand l'utilisateur a demande moins de mouvement
+// (reduced_motion). L'ecran reste alors parfaitement lisible, fige.
+lv_obj_t *build_celebration_screen_wide(const TrophyStats &gained, AppLanguage lang, bool animate);
 
 // --- Couche de navigation tactile (board 7", GT911) -------------------
 //
