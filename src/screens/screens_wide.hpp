@@ -89,16 +89,4 @@ lv_obj_t *attach_wide_back_overlay(lv_obj_t *screen, WideNavHandler handler, voi
 // connexion... tout ?").
 lv_obj_t *build_wifi_setup_screen_wide(const std::string &ssid, const std::string &ip_address, AppLanguage lang);
 
-// TEST -- direction epuree (retour utilisateur du 2026-07-29 "trop
-// charge/sci-fi"), preview simulateur uniquement, jamais branchee sur le
-// vrai firmware tant que non validee.
-lv_obj_t *build_dashboard_screen_wide_v2(const ProfileData &p, AppLanguage lang);
-lv_obj_t *build_trophy_screen_wide_v2(TrophyKind kind, int value, int sub_index, int sub_count, AppLanguage lang);
-lv_obj_t *build_stat_screen_wide_v2(StatIconKind icon_kind, const char *value, const char *caption, int sub_index,
-                                     int sub_count);
-lv_obj_t *build_trophy_screen_wide_v3(TrophyKind kind, int value, int sub_index, int sub_count, AppLanguage lang);
-lv_obj_t *build_trophy_screen_wide_v4(TrophyKind kind, int value, int sub_index, int sub_count, AppLanguage lang);
-lv_obj_t *build_stat_screen_wide_v3(StatIconKind icon_kind, const char *value, const char *caption, int sub_index,
-                                     int sub_count);
-
 } // namespace trophy
