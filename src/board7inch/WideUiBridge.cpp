@@ -12,7 +12,24 @@ namespace {
 // 2026-07-29, apres avoir teste 12s sur le materiel) -- redescendu entre
 // l'original (3s, trop rapide) et 12s (trop lent).
 constexpr uint32_t kSlideMs = 7000;
-constexpr int kSlideCount = 10;
+constexpr uint32_t kStateScreenMs = 7000;
+constexpr int kSlideCount = 8;
+
+// Retour automatique au defilement apres ce delai sans contact. Assez long
+// pour lire un ecran tranquillement sans qu'il file, assez court pour
+// qu'un appareil laisse tel quel apres un appui distrait redevienne seul
+// la vitrine qu'il est censee etre.
+constexpr uint32_t kIdleResumeMs = 20000;
+
+// La celebration reste un peu plus longtemps que les ecrans d'etat : elle
+// interrompt le defilement pour une bonne nouvelle, autant laisser le
+// temps de lever les yeux.
+constexpr uint32_t kCelebrationMs = 10000;
+
+// Un swipe peut produire plusieurs evenements de geste consecutifs, et
+// chaque navigation reconstruit un ecran entier : sans ce garde-fou, un
+// geste un peu appuye saute deux ou trois slides d'un coup.
+constexpr uint32_t kNavDebounceMs = 250;
 
 // Meme mapping que RoundUiBridge (src/ui/RoundUiBridge.cpp, non reutilise
 // directement : prive a cette classe-la, et couplee au framework de pages
@@ -33,20 +50,102 @@ trophy::SyncState mapSyncState(SyncState state) {
   return trophy::SyncState::Idle;
 }
 
-}  // namespace
-
-void WideUiBridge::showSyncState(SyncState /*state*/) {
-  // Pas d'ecran Sync dedie cote large (voir header) : l'etat de sync est
-  // deja repercute sur le badge du Dashboard via mapProfile()/p.sync.
+int syncProgressFor(SyncState state) {
+  switch (state) {
+    case SyncState::kWaitingForNetwork:
+    case SyncState::kConnecting:
+      return 24;
+    case SyncState::kDownloading:
+      return 64;
+    case SyncState::kParsing:
+    case SyncState::kSaving:
+      return 82;
+    case SyncState::kSuccess:
+      return 100;
+    case SyncState::kError:
+      return 100;
+    case SyncState::kIdle:
+    case SyncState::kOffline:
+      return 0;
+  }
+  return 0;
 }
 
-void WideUiBridge::showTrophyDelta(const TrophyDelta& /*delta*/) {
-  // Pas d'ecran de celebration dedie cote large pour l'instant.
+}  // namespace
+
+void WideUiBridge::showSyncState(SyncState state) {
+  profile_.sync = mapSyncState(state);
+  if (!began_ || showingSetup_) {
+    lastRawSyncState_ = state;
+    return;
+  }
+
+  if (isSyncActive(state)) {
+    if (syncStateDismissed_ && state == dismissedSyncState_) return;
+    if (state == lastRawSyncState_ && showingStateScreen_ && stateScreenKind_ == StateScreenKind::kSync) return;
+    lastRawSyncState_ = state;
+    showStateScreen(trophy::build_sync_screen_wide(profile_.sync, syncProgressFor(state), language_),
+                    StateScreenKind::kSync);
+    return;
+  }
+
+  syncStateDismissed_ = false;
+  dismissedSyncState_ = SyncState::kIdle;
+  if (state == lastRawSyncState_ && showingStateScreen_) return;
+  lastRawSyncState_ = state;
+
+  if (state == SyncState::kOffline) {
+    showStateScreen(trophy::build_offline_screen_wide(profile_, language_), StateScreenKind::kOffline);
+    return;
+  }
+  if (state == SyncState::kSuccess && showingStateScreen_) {
+    showStateScreen(trophy::build_sync_screen_wide(trophy::SyncState::Done, 100, language_), StateScreenKind::kSync);
+    clearStateScreen();
+    lastSlideMs_ = nowMillis_;
+    return;
+  }
+  if (state == SyncState::kIdle && showingStateScreen_) {
+    clearStateScreen();
+    lastSlideMs_ = nowMillis_;
+    loadSlide(slideIndex_);
+  }
+}
+
+void WideUiBridge::showTrophyDelta(const TrophyDelta& delta) {
+  // Rien a feter pendant la configuration initiale ni avant le premier
+  // ecran : l'appareil n'a pas encore d'historique auquel comparer.
+  if (!began_ || showingSetup_) return;
+  if (!delta.hasNewTrophy()) return;
+
+  // TrophyDelta appartient a la couche data, les ecrans n'en connaissent
+  // rien : on convertit en TrophyStats (type UI) ou chaque champ porte un
+  // GAIN et non un total.
+  trophy::TrophyStats gained;
+  gained.total = delta.totalDelta;
+  gained.platinum = delta.platinumDelta;
+  gained.gold = delta.goldDelta;
+  gained.silver = delta.silverDelta;
+  gained.bronze = delta.bronzeDelta;
+
+  Logger::info("[UI 7\"] Nouveau(x) trophee(s) : +%d (P%d O%d A%d B%d)", delta.totalDelta, delta.platinumDelta,
+               delta.goldDelta, delta.silverDelta, delta.bronzeDelta);
+  showStateScreen(trophy::build_celebration_screen_wide(gained, language_, !profile_.reduced_motion),
+                  StateScreenKind::kCelebration);
 }
 
 void WideUiBridge::showError(const AppError& error) {
   if (error.hasError()) {
+    if (error.code == lastErrorCode_ && error.message == lastErrorMessage_) return;
+    lastErrorCode_ = error.code;
+    lastErrorMessage_ = error.message;
     Logger::error("[UI 7\"] Erreur applicative (code=%d): %s", error.code, error.message.c_str());
+    trophy::ProfileData errorProfile = profile_;
+    errorProfile.error_title = language_ == AppLanguage::kFrench ? "Profil indisponible" : "Profile unavailable";
+    errorProfile.error_message = error.message.empty()
+                                     ? (language_ == AppLanguage::kFrench ? "Synchronisation interrompue."
+                                                                          : "Sync interrupted.")
+                                     : error.message;
+    showStateScreen(trophy::build_error_screen_wide(errorProfile, language_), StateScreenKind::kError);
   }
 }
 
@@ -89,8 +188,11 @@ std::string WideUiBridge::formatUpdated(AppLanguage lang) const {
 trophy::ProfileData WideUiBridge::mapProfile(const AppState& state) const {
   trophy::ProfileData p;
   p.username = state.profile.username.empty() ? "-" : state.profile.username;
+  p.avatar_file_name = state.profile.avatarFileName;
+  p.country = state.profile.country;
   p.level = state.profile.level;
   p.progress = state.profile.levelProgressPercent;
+  p.level_remaining_points = state.profile.levelRemainingPoints;
   p.total = state.stats.totalTrophies;
   p.platinum = state.stats.platinum;
   p.gold = state.stats.gold;
@@ -100,12 +202,19 @@ trophy::ProfileData WideUiBridge::mapProfile(const AppState& state) const {
   p.completion = static_cast<int>(state.stats.completionRatePercent + 0.5f);
   p.world_rank =
       state.stats.worldRank > 0 ? ("#" + trophy::format_number(state.stats.worldRank)) : "-";
+  p.national_rank = state.stats.nationalRank > 0 ? trophy::format_number(state.stats.nationalRank) : "-";
+  p.trophy_points = state.stats.trophyPoints > 0 ? trophy::format_number(state.stats.trophyPoints) : "-";
   p.play_time = state.stats.playtimeHours > 0.0f
                     ? (trophy::format_number(static_cast<int>(state.stats.playtimeHours + 0.5f)) + " h")
                     : "-";
   p.updated = formatUpdated(state.settings.language);
   p.offline = state.sync.isOffline;
   p.sync = mapSyncState(state.sync.state);
+  p.has_ps_plus = state.profile.hasPsPlus;
+  p.brightness = state.settings.brightnessPercent;
+  p.reduced_motion = !state.settings.animationsEnabled;
+  p.auto_rotate = state.settings.autoRotateEnabled;
+  p.sync_interval_minutes = state.settings.syncIntervalMinutes;
   return p;
 }
 
@@ -115,6 +224,13 @@ void WideUiBridge::setAppState(const AppState& state) {
     lastSyncMillis_ = nowMillis_;
     everSynced_ = true;
   }
+  if (!state.sync.lastError.hasError()) {
+    lastErrorCode_ = 0;
+    lastErrorMessage_.clear();
+    if (showingStateScreen_ && stateScreenKind_ == StateScreenKind::kError) {
+      clearStateScreen();
+    }
+  }
   profile_ = mapProfile(state);
   network_ = state.network;
   language_ = state.settings.language;
@@ -122,49 +238,33 @@ void WideUiBridge::setAppState(const AppState& state) {
 
 void WideUiBridge::loadSlide(int index) {
   lv_obj_t* next = nullptr;
-  char buf[16];
-  using trophy::Str;
-  using trophy::tr;
   switch (index) {
     case 0:
       next = trophy::build_dashboard_screen_wide(profile_, language_);
       break;
     case 1:
-      next = trophy::build_trophy_screen_wide(trophy::TrophyKind::Platinum, profile_.platinum, 0, 4, language_);
+      next = trophy::build_trophies_overview_screen_wide(profile_, language_);
       break;
     case 2:
-      next = trophy::build_trophy_screen_wide(trophy::TrophyKind::Gold, profile_.gold, 1, 4, language_);
+      next = trophy::build_trophy_screen_wide(trophy::TrophyKind::Platinum, profile_.platinum, profile_.total, 0, 4, language_);
       break;
     case 3:
-      next = trophy::build_trophy_screen_wide(trophy::TrophyKind::Silver, profile_.silver, 2, 4, language_);
+      next = trophy::build_trophy_screen_wide(trophy::TrophyKind::Gold, profile_.gold, profile_.total, 1, 4, language_);
       break;
     case 4:
-      next = trophy::build_trophy_screen_wide(trophy::TrophyKind::Bronze, profile_.bronze, 3, 4, language_);
+      next = trophy::build_trophy_screen_wide(trophy::TrophyKind::Silver, profile_.silver, profile_.total, 2, 4, language_);
       break;
     case 5:
-      next = trophy::build_stat_screen_wide(trophy::StatIconKind::Gamepad,
-                                             trophy::format_number(profile_.games_completed).c_str(),
-                                             tr(language_, Str::kGamesCompleted), 0, 4);
+      next = trophy::build_trophy_screen_wide(trophy::TrophyKind::Bronze, profile_.bronze, profile_.total, 3, 4, language_);
       break;
     case 6:
-      std::snprintf(buf, sizeof(buf), "%d %%", profile_.completion);
-      next = trophy::build_stat_screen_wide(trophy::StatIconKind::Percent, buf,
-                                             tr(language_, Str::kStatCompletionCaption), 1,
-                                             4);
+      next = trophy::build_statistics_overview_screen_wide(profile_, language_);
       break;
     case 7:
-      next = trophy::build_stat_screen_wide(trophy::StatIconKind::Medal, profile_.world_rank.c_str(),
-                                             tr(language_, Str::kWorldRank), 2, 4);
-      break;
-    case 8:
-      next = trophy::build_stat_screen_wide(trophy::StatIconKind::Clock, profile_.play_time.c_str(),
-                                             tr(language_, Str::kPlayTime), 3, 4);
-      break;
-    case 9:
-      // Mention Pocket PSN (source des donnees) : le board rond a un ecran
-      // "A propos" equivalent mais accessible par tactile -- ce board n'en
-      // a pas, donc integre au defilement automatique. Retour utilisateur
-      // du 2026-07-28 ("zero ref a pocket psn").
+      // Mention Pocket PSN (source des donnees) : maintenue dans le
+      // defilement meme depuis l'ajout du tactile -- la source des donnees
+      // doit se voir sans qu'on ait a la chercher dans un menu. Retour
+      // utilisateur du 2026-07-28 ("zero ref a pocket psn").
       next = trophy::build_credits_screen_wide(language_);
       break;
     default:
@@ -172,6 +272,210 @@ void WideUiBridge::loadSlide(int index) {
   }
   if (next == nullptr) return;
   showScreen(next);
+  attachNavLayer(next);
+}
+
+void WideUiBridge::attachNavLayer(lv_obj_t* screen) {
+  if (screen == nullptr) return;
+  lv_obj_add_event_cb(screen, &WideUiBridge::onScreenGesture, LV_EVENT_GESTURE, this);
+  navOverlay_ = trophy::attach_wide_nav_overlay(screen, slideIndex_, kSlideCount, &WideUiBridge::onNavAction, this);
+  // La couche est reconstruite avec chaque ecran : elle doit repartir dans
+  // l'etat courant, pas dans son etat par defaut.
+  if (navOverlay_ != nullptr && !interactive_) lv_obj_add_flag(navOverlay_, LV_OBJ_FLAG_HIDDEN);
+}
+
+void WideUiBridge::onNavAction(trophy::WideNavAction action, int target, void* owner) {
+  auto* self = static_cast<WideUiBridge*>(owner);
+  if (self == nullptr) return;
+  self->handleNav(action, target);
+}
+
+void WideUiBridge::onScreenGesture(lv_event_t* e) {
+  auto* self = static_cast<WideUiBridge*>(lv_event_get_user_data(e));
+  if (self == nullptr) return;
+  lv_indev_t* indev = lv_indev_active();
+  if (indev == nullptr) return;
+  const lv_dir_t dir = lv_indev_get_gesture_dir(indev);
+  if (dir == LV_DIR_LEFT) {
+    self->handleNav(trophy::WideNavAction::kNext, 0);
+  } else if (dir == LV_DIR_RIGHT) {
+    self->handleNav(trophy::WideNavAction::kPrev, 0);
+  }
+}
+
+void WideUiBridge::handleNav(trophy::WideNavAction action, int target) {
+  // Appele depuis un callback LVGL : on n'y touche pas a l'arbre d'objets,
+  // on note seulement quoi faire (voir navPending_).
+  //
+  // Toujours avant l'anti-rebond : meme un geste ignore prouve que
+  // quelqu'un est devant l'appareil, et doit repousser le retour ambiant.
+  noteTouchActivity();
+  if (nowMillis_ - lastNavMs_ < kNavDebounceMs) return;
+  lastNavMs_ = nowMillis_;
+  navPending_ = true;
+  pendingAction_ = action;
+  pendingTarget_ = target;
+}
+
+void WideUiBridge::applyPendingNav() {
+  if (!navPending_) return;
+  navPending_ = false;
+  const trophy::WideNavAction action = pendingAction_;
+  const int target = pendingTarget_;
+
+  if (showingSettings_) {
+    // Depuis les Reglages, seul le retour a un sens. Le swipe vers la
+    // droite ferme aussi, c'est le geste "retour" attendu par reflexe.
+    if (action == trophy::WideNavAction::kCloseSettings || action == trophy::WideNavAction::kPrev) closeSettings();
+    return;
+  }
+
+  switch (action) {
+    case trophy::WideNavAction::kPrev:
+      slideIndex_ = (slideIndex_ + kSlideCount - 1) % kSlideCount;
+      loadSlide(slideIndex_);
+      break;
+    case trophy::WideNavAction::kNext:
+      slideIndex_ = (slideIndex_ + 1) % kSlideCount;
+      loadSlide(slideIndex_);
+      break;
+    case trophy::WideNavAction::kGoTo:
+      if (target < 0 || target >= kSlideCount || target == slideIndex_) return;
+      slideIndex_ = target;
+      loadSlide(slideIndex_);
+      break;
+    case trophy::WideNavAction::kOpenSettings:
+      openSettings();
+      break;
+    case trophy::WideNavAction::kCloseSettings:
+      break;
+  }
+}
+
+void WideUiBridge::noteTouchActivity() {
+  lastTouchMs_ = nowMillis_;
+  if (!interactive_) setInteractive(true);
+}
+
+void WideUiBridge::pollTouchActivity() {
+  for (lv_indev_t* indev = lv_indev_get_next(nullptr); indev != nullptr; indev = lv_indev_get_next(indev)) {
+    if (lv_indev_get_type(indev) != LV_INDEV_TYPE_POINTER) continue;
+    if (lv_indev_get_state(indev) == LV_INDEV_STATE_PRESSED) {
+      noteTouchActivity();
+      return;
+    }
+  }
+}
+
+void WideUiBridge::setInteractive(bool interactive) {
+  if (interactive_ != interactive) {
+    Logger::info("[UI 7\"] Mode %s (t=%ums, slide=%d)", interactive ? "interactif" : "ambiant",
+                 static_cast<unsigned>(nowMillis_), slideIndex_);
+  }
+  interactive_ = interactive;
+  if (navOverlay_ == nullptr) return;
+  if (interactive) {
+    lv_obj_clear_flag(navOverlay_, LV_OBJ_FLAG_HIDDEN);
+  } else {
+    lv_obj_add_flag(navOverlay_, LV_OBJ_FLAG_HIDDEN);
+  }
+}
+
+void WideUiBridge::openSettings() {
+  if (showingSettings_) return;
+  showingSettings_ = true;
+  showSettingsScreen();
+}
+
+void WideUiBridge::setConfigPatchHandler(ConfigPatchFn fn, void* owner) {
+  configPatch_ = fn;
+  configPatchOwner_ = owner;
+}
+
+void WideUiBridge::onSettingAction(trophy::WideSettingAction action, void* owner) {
+  auto* self = static_cast<WideUiBridge*>(owner);
+  if (self == nullptr) return;
+  self->noteTouchActivity();
+  if (self->nowMillis_ - self->lastNavMs_ < kNavDebounceMs) return;
+  self->lastNavMs_ = self->nowMillis_;
+  self->settingPending_ = true;
+  self->pendingSetting_ = action;
+}
+
+void WideUiBridge::applyPendingSetting() {
+  if (!settingPending_) return;
+  settingPending_ = false;
+  const trophy::WideSettingAction action = pendingSetting_;
+
+  // Sans chemin retour (simulateur de previsualisation), l'ecran reste
+  // lisible mais inerte plutot que de mentir sur un changement applique.
+  if (configPatch_ == nullptr) return;
+
+  // Patch partiel : ConfigManager::applyJsonPatch n'applique que les
+  // champs presents, les autres reglages sont donc preserves.
+  char json[96];
+  switch (action) {
+    case trophy::WideSettingAction::kBrightness: {
+      // Cycle 25 -> 50 -> 75 -> 100 -> 25. Pas de curseur : viser une
+      // valeur precise au doigt sur une barre de 86 px serait penible,
+      // alors que quatre paliers se traversent en quatre appuis.
+      const int current = profile_.brightness < 0 ? 0 : (profile_.brightness > 100 ? 100 : profile_.brightness);
+      const int next = ((current / 25) % 4 + 1) * 25;
+      std::snprintf(json, sizeof(json), "{%cbrightnessPercent%c:%d}", '"', '"', next);
+      break;
+    }
+    case trophy::WideSettingAction::kAutoRotate:
+      std::snprintf(json, sizeof(json), "{%cautoRotateEnabled%c:%s}", '"', '"', profile_.auto_rotate ? "false" : "true");
+      break;
+    case trophy::WideSettingAction::kAnimations:
+      std::snprintf(json, sizeof(json), "{%canimationsEnabled%c:%s}", '"', '"',
+                    profile_.reduced_motion ? "true" : "false");
+      break;
+    case trophy::WideSettingAction::kSyncInterval: {
+      // Cycle 15 -> 30 -> 60 -> 120 min. Pocket PSN est un service tiers
+      // gratuit : ne pas proposer plus court que 15 min.
+      int next = 15;
+      if (profile_.sync_interval_minutes < 30) next = 30;
+      else if (profile_.sync_interval_minutes < 60) next = 60;
+      else if (profile_.sync_interval_minutes < 120) next = 120;
+      std::snprintf(json, sizeof(json), "{%csyncIntervalMinutes%c:%d}", '"', '"', next);
+      break;
+    }
+    case trophy::WideSettingAction::kLanguage:
+      std::snprintf(json, sizeof(json), "{%clanguage%c:%c%s%c}", '"', '"', '"',
+                    language_ == AppLanguage::kFrench ? "en" : "fr", '"');
+      break;
+    case trophy::WideSettingAction::kNone:
+      return;
+  }
+
+  if (!configPatch_(json, configPatchOwner_)) {
+    Logger::warn("[UI 7\"] Reglage refuse par la configuration : %s", json);
+    return;
+  }
+  Logger::info("[UI 7\"] Reglage applique : %s", json);
+
+  // AppController::applyConfigPatch republie l'etat avant de rendre la
+  // main, donc profile_ et language_ portent deja la nouvelle valeur :
+  // reconstruire l'ecran suffit a la montrer.
+  if (showingSettings_) showSettingsScreen();
+}
+
+void WideUiBridge::showSettingsScreen() {
+  lv_obj_t* next = trophy::build_settings_screen_wide(profile_, language_, &WideUiBridge::onSettingAction, this);
+  if (next == nullptr) return;
+  showScreen(next);
+  lv_obj_add_event_cb(next, &WideUiBridge::onScreenGesture, LV_EVENT_GESTURE, this);
+  // Le retour reste visible en permanence sur cet ecran : on y arrive
+  // forcement par un appui, le masquer enfermerait l'utilisateur.
+  navOverlay_ = trophy::attach_wide_back_overlay(next, &WideUiBridge::onNavAction, this, language_);
+}
+
+void WideUiBridge::closeSettings() {
+  if (!showingSettings_) return;
+  showingSettings_ = false;
+  lastSlideMs_ = nowMillis_;
+  loadSlide(slideIndex_);
 }
 
 void WideUiBridge::loadWifiSetupScreen() {
@@ -185,9 +489,30 @@ void WideUiBridge::loadWifiSetupScreen() {
 
 void WideUiBridge::showScreen(lv_obj_t* next) {
   lv_obj_t* previous = currentScreen_;
+  // La couche de navigation est un enfant de l'ecran sortant : elle part
+  // avec lui, il ne reste qu'a oublier le pointeur avant la destruction.
+  navOverlay_ = nullptr;
   lv_scr_load(next);
   currentScreen_ = next;
   if (previous != nullptr) lv_obj_delete(previous);
+}
+
+void WideUiBridge::showStateScreen(lv_obj_t* next, StateScreenKind kind) {
+  if (next == nullptr) return;
+  showingStateScreen_ = true;
+  stateScreenKind_ = kind;
+  lastSlideMs_ = nowMillis_;
+  // Un ecran d'etat (sync/hors ligne/erreur) est modal : il reprend la
+  // main sur la navigation manuelle plutot que de la laisser a moitie
+  // active sur un ecran qui n'a ni points ni fleches.
+  showingSettings_ = false;
+  interactive_ = false;
+  showScreen(next);
+}
+
+void WideUiBridge::clearStateScreen() {
+  showingStateScreen_ = false;
+  stateScreenKind_ = StateScreenKind::kNone;
 }
 
 void WideUiBridge::begin() {
@@ -216,11 +541,47 @@ void WideUiBridge::tick(uint32_t nowMillis) {
       // qui tournait dans le vide pendant l'ecran de connexion.
       slideIndex_ = 0;
       lastSlideMs_ = nowMillis;
+      clearStateScreen();
       loadSlide(slideIndex_);
     }
     return;
   }
   if (showingSetup_) return;  // defilement en pause tant que la config est requise
+  if (showingStateScreen_) {
+    const bool canAutoDismiss =
+        stateScreenKind_ == StateScreenKind::kSync || stateScreenKind_ == StateScreenKind::kError ||
+        stateScreenKind_ == StateScreenKind::kOffline || stateScreenKind_ == StateScreenKind::kCelebration;
+    const uint32_t dwellMs =
+        stateScreenKind_ == StateScreenKind::kCelebration ? kCelebrationMs : kStateScreenMs;
+    if (canAutoDismiss && nowMillis - lastSlideMs_ >= dwellMs) {
+      if (stateScreenKind_ == StateScreenKind::kSync) {
+        syncStateDismissed_ = true;
+        dismissedSyncState_ = lastRawSyncState_;
+      }
+      clearStateScreen();
+      lastSlideMs_ = nowMillis;
+      loadSlide(slideIndex_);
+    }
+    return;
+  }
+
+  // A partir d'ici on est sur un ecran du defilement : c'est le seul
+  // contexte ou le tactile de navigation a un sens.
+  pollTouchActivity();
+  // LVGL est au repos a cet instant : c'est le seul endroit sur pour
+  // detruire et reconstruire un ecran.
+  applyPendingNav();
+  applyPendingSetting();
+
+  if (interactive_) {
+    if (nowMillis - lastTouchMs_ < kIdleResumeMs) return;  // quelqu'un a la main
+    // Plus de contact depuis un moment : on referme la navigation et
+    // l'appareil redevient la vitrine autonome qu'il doit etre par defaut.
+    if (showingSettings_) closeSettings();
+    setInteractive(false);
+    lastSlideMs_ = nowMillis;
+    return;
+  }
 
   if (nowMillis - lastSlideMs_ >= kSlideMs) {
     lastSlideMs_ = nowMillis;

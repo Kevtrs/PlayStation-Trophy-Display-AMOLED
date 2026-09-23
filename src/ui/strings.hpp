@@ -71,6 +71,7 @@ enum class Str {
 
     // Celebration.
     kNewTrophyTitle,
+    kNewTrophiesTitle, // pluriel : plusieurs trophees dans la meme synchro
     kMultipleTrophiesFormat,
     kTapToReturn,
 
@@ -82,6 +83,11 @@ enum class Str {
     kAnimationsActive,
     kProfileLabel,
     kRefreshLabel,
+    kAutoRotateLabel,   // ecran Reglages 7" : etaient ecrits en dur en
+    kAnimationsLabel,   // francais, donc intraduisibles depuis la bascule
+    kLanguageLabel,     // de langue ajoutee sur ce meme ecran
+    kLanguageFrench,
+    kLanguageEnglish,
     kSimulateValue,
     kCelebrationLabel,
     kTestValue,
@@ -189,9 +195,9 @@ enum class Str {
     kFixtureErrorStateTitle,
     kFixtureErrorStateMessage,
 
-    // screens_wide.cpp : build_wifi_setup_screen_wide() (board 7", pas de
-    // tactile -- voir WideUiBridge.h).
+    // screens_wide.cpp : build_wifi_setup_screen_wide() (board 7").
     kWifiSetupTitle,
+    kWifiSetupScan, // invite de scan du QR d'appairage Wi-Fi
     kWifiSetupInstruction,
     kWifiSetupFallbackFormat, // printf-style, %s = adresse IP (voir kProgressToNextFormat)
 

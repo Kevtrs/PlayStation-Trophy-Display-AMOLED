@@ -5,6 +5,7 @@ namespace {
 void fillDefaultDemoProfile(ProfileData& p) {
   p.username = "Kevin_Trophies";
   p.country = "FR";
+  p.avatarFileName = "A2117_l.png";
   p.level = 327;
   p.levelProgressPercent = 72;  // "XP 64 820 / 90 000" sur la maquette
   p.levelRemainingPoints = 90000 - 64820;

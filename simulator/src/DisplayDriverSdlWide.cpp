@@ -29,6 +29,16 @@ void flushCb(lv_display_t* display, const lv_area_t* area, uint8_t* pxMap) {
   lv_display_flush_ready(display);
 }
 
+int pointerX_ = 0;
+int pointerY_ = 0;
+bool pointerPressed_ = false;
+
+void pointerReadCb(lv_indev_t* /*indev*/, lv_indev_data_t* data) {
+  data->point.x = pointerX_;
+  data->point.y = pointerY_;
+  data->state = pointerPressed_ ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+}
+
 void rgb565ToRgb888(uint16_t raw, uint8_t& r, uint8_t& g, uint8_t& b) {
   r = static_cast<uint8_t>(((raw >> 11) & 0x1F) * 255 / 31);
   g = static_cast<uint8_t>(((raw >> 5) & 0x3F) * 255 / 63);
@@ -51,6 +61,18 @@ void init(SDL_Renderer* renderer, int widthPx, int heightPx) {
   lv_display_set_flush_cb(display, flushCb);
   lv_display_set_buffers(display, lvglBuf1_.data(), lvglBuf2_.data(),
                          static_cast<uint32_t>(lvglBuf1_.size() * sizeof(uint16_t)), LV_DISPLAY_RENDER_MODE_PARTIAL);
+}
+
+void registerPointer() {
+  lv_indev_t* indev = lv_indev_create();
+  lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
+  lv_indev_set_read_cb(indev, pointerReadCb);
+}
+
+void setPointerState(int x, int y, bool pressed) {
+  pointerX_ = x;
+  pointerY_ = y;
+  pointerPressed_ = pressed;
 }
 
 void present(SDL_Renderer* renderer) {

@@ -15,4 +15,15 @@ void init(SDL_Renderer* renderer, int widthPx, int heightPx);
 void present(SDL_Renderer* renderer);
 bool saveScreenshotPng(const char* path);
 
+// Pointeur LVGL alimente par la souris SDL, pour que la couche tactile du
+// board 7" (GT911 sur le vrai materiel, voir main_7inch.cpp) soit testable
+// sans carte : la souris joue le doigt. Sans ca, aucun contributeur ne
+// peut verifier la navigation tactile avant d'avoir le materiel en main.
+void registerPointer();
+
+// A appeler depuis la boucle d'evenements SDL. LVGL relit cet etat a son
+// rythme (lv_timer_handler), il doit donc rester valable entre deux
+// evenements, pas etre consomme une seule fois.
+void setPointerState(int x, int y, bool pressed);
+
 }  // namespace DisplayDriverSdlWide

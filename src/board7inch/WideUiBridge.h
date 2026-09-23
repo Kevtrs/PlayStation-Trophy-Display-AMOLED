@@ -13,8 +13,24 @@
 // screens_wide.hpp) : meme role que RoundUiBridge pour l'ecran rond, mais
 // sans le framework de pages "App"/ui_model (screens_wide.cpp prend des
 // donnees pures) -- fait donc defiler lui-meme, automatiquement, Dashboard
-// -> 4 trophees -> 4 statistiques -> Dashboard... (aucun tactile requis,
-// voir la decision de design du 2026-07-28).
+// -> 4 trophees -> 4 statistiques -> Dashboard...
+//
+// Deux modes, volontairement dans cet ordre de priorite :
+//
+//  - AMBIANT (defaut) : le defilement tourne seul, aucun controle affiche.
+//    L'appareil est un objet pose sur un bureau, il doit etre lisible et
+//    complet sans qu'on y touche -- c'est l'etat dans lequel il passe la
+//    quasi-totalite de son temps.
+//  - INTERACTIF : declenche par n'importe quel appui (le GT911 est
+//    enregistre dans LVGL, voir main_7inch.cpp). Met le defilement en
+//    pause, affiche la couche de navigation (fleches, points cliquables,
+//    engrenage). Revient tout seul en ambiant apres kIdleResumeMs sans
+//    contact, pour qu'un appareil laisse tel quel ne reste jamais bloque
+//    sur un ecran.
+//
+// Le tactile n'est donc jamais indispensable : il ouvre des raccourcis
+// (aller directement a un ecran, atteindre les Reglages) sans qu'aucune
+// information ne devienne inaccessible a qui ne touche rien.
 //
 // Aucune page Boot/Sync/Erreur dediee pour l'instant (voir Key Technical
 // Concepts, seuls Dashboard/Trophees/Statistiques sont dessines cote large)
@@ -33,6 +49,14 @@ class WideUiBridge : public UiBridge {
   // aussi etre appele avec le verrou esp_lv_adapter pris.
   void tick(uint32_t nowMillis);
 
+  // Chemin retour UI -> application. UiBridge est descendant par
+  // construction, et l'elargir toucherait aussi l'ecran rond : le point
+  // d'entree est donc injecte depuis main_7inch.cpp. Renvoie true si le
+  // patch a ete applique. Sans handler, l'ecran Reglages reste lisible
+  // mais inerte -- c'est le cas du simulateur de previsualisation.
+  using ConfigPatchFn = bool (*)(const char* json, void* owner);
+  void setConfigPatchHandler(ConfigPatchFn fn, void* owner);
+
   // UiBridge
   void setAppState(const AppState& state) override;
   void showSyncState(SyncState state) override;
@@ -45,6 +69,39 @@ class WideUiBridge : public UiBridge {
   std::string formatUpdated(AppLanguage lang) const;
   void loadSlide(int index);
   void loadWifiSetupScreen();
+
+  // --- Tactile ---------------------------------------------------------
+  // Point d'entree unique des controles de la couche de navigation
+  // (trampoline C -> membre, LVGL ne connait que des fonctions libres).
+  static void onNavAction(trophy::WideNavAction action, int target, void* owner);
+  static void onScreenGesture(lv_event_t* e);
+  void handleNav(trophy::WideNavAction action, int target);
+  // Applique l'action en attente, depuis tick() uniquement.
+  void applyPendingNav();
+  // Enregistre un contact et bascule en mode interactif si besoin.
+  void noteTouchActivity();
+  // Lit l'etat du pointeur LVGL a chaque tick : un appui sur une carte est
+  // absorbe par cette carte et ne remonte pas jusqu'a l'ecran, donc un
+  // callback pose sur la racine raterait la moitie des appuis.
+  void pollTouchActivity();
+  void setInteractive(bool interactive);
+  void attachNavLayer(lv_obj_t* screen);
+  void openSettings();
+  static void onSettingAction(trophy::WideSettingAction action, void* owner);
+  // Meme raison que pour la navigation : un callback LVGL ne doit pas
+  // reconstruire l'ecran dans lequel il s'execute.
+  void applyPendingSetting();
+  void showSettingsScreen();
+  void closeSettings();
+  enum class StateScreenKind : uint8_t {
+    kNone,
+    kSync,
+    kOffline,
+    kError,
+    kCelebration,
+  };
+  void showStateScreen(lv_obj_t* next, StateScreenKind kind);
+  void clearStateScreen();
   void showScreen(lv_obj_t* next);
 
   trophy::ProfileData profile_;
@@ -56,12 +113,35 @@ class WideUiBridge : public UiBridge {
   lv_obj_t* currentScreen_ = nullptr;
   bool began_ = false;
 
+  // Mode interactif : defilement en pause, couche de navigation visible.
+  bool interactive_ = false;
+  uint32_t lastTouchMs_ = 0;
+  uint32_t lastNavMs_ = 0;
+  bool showingSettings_ = false;
+  // Appartient a currentScreen_ : remis a nullptr des que cet ecran est
+  // detruit (voir showScreen()), jamais libere separement.
+  lv_obj_t* navOverlay_ = nullptr;
+
+  // Callbacks LVGL : ils s'executent DANS l'arbre de l'ecran courant, donc
+  // ils n'y touchent jamais directement -- ils enregistrent une intention
+  // que tick() realise une fois LVGL au repos. Vaut pour la navigation
+  // comme pour les reglages.
+  ConfigPatchFn configPatch_ = nullptr;
+  void* configPatchOwner_ = nullptr;
+  bool settingPending_ = false;
+  trophy::WideSettingAction pendingSetting_ = trophy::WideSettingAction::kNone;
+
+  bool navPending_ = false;
+  trophy::WideNavAction pendingAction_ = trophy::WideNavAction::kNext;
+  int pendingTarget_ = 0;
+
   // Tant qu'aucun Wi-Fi/compte n'est configure (WifiState::kAccessPoint,
   // voir AppController::tick()), l'ecran de connexion (build_wifi_setup_
-  // screen_wide) remplace ENTIEREMENT le defilement normal -- ce board n'a
-  // pas de tactile, un utilisateur non-technique doit voir cette info et
-  // seulement elle, pas des trophees de demo qui donneraient l'impression
-  // que c'est deja configure. Retour utilisateur du 2026-07-29.
+  // screen_wide) remplace ENTIEREMENT le defilement normal : un
+  // utilisateur non-technique doit voir cette info et seulement elle, pas
+  // des trophees de demo qui donneraient l'impression que c'est deja
+  // configure. Cet ecran ne recoit donc aucune couche de navigation, meme
+  // depuis l'ajout du tactile. Retour utilisateur du 2026-07-29.
   NetworkStatus network_;
   bool showingSetup_ = false;
 
@@ -72,4 +152,11 @@ class WideUiBridge : public UiBridge {
   bool everSynced_ = false;
   uint32_t lastSyncMillis_ = 0;
   uint32_t lastSeenSyncEpoch_ = 0;
+  bool showingStateScreen_ = false;
+  StateScreenKind stateScreenKind_ = StateScreenKind::kNone;
+  SyncState lastRawSyncState_ = SyncState::kIdle;
+  bool syncStateDismissed_ = false;
+  SyncState dismissedSyncState_ = SyncState::kIdle;
+  int lastErrorCode_ = 0;
+  std::string lastErrorMessage_;
 };

@@ -29,7 +29,7 @@
 #pragma once
 
 // *INDENT-OFF*
-#define ESP_OPEN_TOUCH 1 // 1 initiates the touch, 0 closes the touch.
+#define ESP_OPEN_TOUCH 0 // Driver GT911 auto desactive: l'IRQ tactile crashe ce board. Tactile manuel en polling dans main_7inch.cpp.
 
 /**
  * @brief Flag to enable custom board configuration (0/1)

@@ -121,6 +121,7 @@ trophy::ProfileData RoundUiBridge::mapProfile(const AppState& state) const {
   trophy::ProfileData p = trophy::ui_get_profile();
 
   p.username = state.profile.username.empty() ? "-" : state.profile.username;
+  p.avatar_file_name = state.profile.avatarFileName;
   p.level = state.profile.level;
   p.progress = state.profile.levelProgressPercent;
   p.total = state.stats.totalTrophies;

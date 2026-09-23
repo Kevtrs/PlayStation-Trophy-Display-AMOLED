@@ -116,6 +116,10 @@ class AppController : public UiActionListener {
  private:
   void publishState();
   void applySettingsAndReconfigure(const AppSettings& newSettings);
+  // Faux tant que wifi_.begin() n'a jamais ete appele : le premier appel
+  // doit passer meme si les identifiants sont vides, c'est lui qui
+  // declenche le point d'acces de secours.
+  bool wifiStarted_ = false;
   void invalidateCacheIfUsernameChanged(const std::string& previousUsername);
 
   ConfigManager config_;

@@ -171,7 +171,19 @@ void AppController::applySettingsAndReconfigure(const AppSettings& newSettings) 
   power_.configure(newSettings.brightnessPercent, newSettings.sleepTimeoutSeconds);
   sync_.configure(newSettings.syncIntervalMinutes);
   time_.begin(newSettings.timezone);
-  wifi_.begin(newSettings.wifiSsid, newSettings.wifiPassword);
+  // Ne relancer le Wi-Fi que si ses identifiants ont reellement change, ou
+  // au tout premier appel (c'est lui qui demarre le point d'acces quand
+  // aucun reseau n'est enregistre).
+  //
+  // L'appel etait inconditionnel : tolerable tant que ce chemin ne servait
+  // qu'au portail web, utilise une fois a la configuration. Depuis que
+  // l'ecran Reglages du board 7" est tactile, chaque changement de
+  // luminosite passait par ici et coupait la connexion.
+  if (!wifiStarted_ || newSettings.wifiSsid != state_.settings.wifiSsid ||
+      newSettings.wifiPassword != state_.settings.wifiPassword) {
+    wifi_.begin(newSettings.wifiSsid, newSettings.wifiPassword);
+    wifiStarted_ = true;
+  }
   state_.settings = newSettings;
 }
 

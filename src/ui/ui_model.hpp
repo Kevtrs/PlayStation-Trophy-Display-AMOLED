@@ -51,8 +51,11 @@ struct TrophyStats {
 
 struct ProfileData {
     std::string username;
+    std::string avatar_file_name;
+    std::string country;
     int level = 0;
     int progress = 0;
+    int level_remaining_points = 0;
     int total = 0;
     int platinum = 0;
     int gold = 0;
@@ -61,6 +64,8 @@ struct ProfileData {
     int games_completed = 0;
     int completion = 0;
     std::string world_rank;
+    std::string national_rank;
+    std::string trophy_points;
     std::string play_time;
     std::string updated;
     std::string offline_message = "Les données locales restent disponibles.";
@@ -71,7 +76,12 @@ struct ProfileData {
     TrophyKind celebration = TrophyKind::Platinum;
     uint32_t celebration_count = 1;
     bool trophy_feed_available = true;
+    bool has_ps_plus = false;
     bool reduced_motion = false;
+    // Refletent AppSettings pour que l'ecran Reglages affiche les vraies
+    // valeurs au lieu de constantes ecrites en dur.
+    bool auto_rotate = true;
+    int sync_interval_minutes = 30;
     int brightness = 82;
 };
 

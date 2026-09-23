@@ -88,6 +88,14 @@
 
 #define LV_USE_SNAPSHOT 0
 
+/* QR code : uniquement pour l'ecran de premiere configuration
+ * (build_wifi_setup_screen_wide). Sans lui, quelqu'un qui deballe
+ * l'appareil doit lire un SSID et une adresse IP a l'ecran, puis les
+ * ressaisir a la main sur son telephone -- la marche exacte que rate un
+ * utilisateur non technique. Le generateur est fourni par LVGL
+ * (src/libs/qrcode), aucune dependance externe. */
+#define LV_USE_QRCODE 1
+
 /* Montserrat : uniquement pour simulator/src/DebugPanel.cpp (fenetre de
  * debug separee, jamais compilee dans le firmware -- voir
  * simulator/CMakeLists.txt). Non reference par le design produit, qui

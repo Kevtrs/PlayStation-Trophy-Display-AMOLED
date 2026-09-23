@@ -32,6 +32,7 @@ constexpr TrophyEntry kHugeEntries[] = {
 ProfileData profile_for_fixture(UiFixture fixture, AppLanguage lang) {
     ProfileData p;
     p.username = "Kevin_Trophies";
+    p.avatar_file_name = "A2117_l.png";
     p.level = 327;
     p.progress = 72;
     p.total = 4286;

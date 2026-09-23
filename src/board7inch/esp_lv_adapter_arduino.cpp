@@ -111,14 +111,26 @@ static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
 {
     Touch *touch = static_cast<Touch *>(lv_indev_get_user_data(indev));
     TouchPoint point = {};
+    static bool was_pressed = false;
+    static uint32_t last_log_ms = 0;
 
     if ((touch != nullptr) && (touch->readPoints(&point, 1, 0) > 0)) {
         data->point.x = point.x;
         data->point.y = point.y;
         data->state = LV_INDEV_STATE_PRESSED;
+        const uint32_t now_ms = lv_tick_get();
+        if ((!was_pressed) || (now_ms - last_log_ms > 250)) {
+            printf("[TOUCH 7] x=%d y=%d strength=%d\n", point.x, point.y, point.strength);
+            last_log_ms = now_ms;
+        }
+        was_pressed = true;
         return;
     }
 
+    if (was_pressed) {
+        printf("[TOUCH 7] release\n");
+        was_pressed = false;
+    }
     data->state = LV_INDEV_STATE_RELEASED;
 }
 
