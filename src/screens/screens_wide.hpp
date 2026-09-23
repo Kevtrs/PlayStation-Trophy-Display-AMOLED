@@ -21,7 +21,25 @@ lv_obj_t *build_statistics_overview_screen_wide(const ProfileData &p, AppLanguag
 lv_obj_t *build_sync_screen_wide(SyncState state, int progress, AppLanguage lang);
 lv_obj_t *build_offline_screen_wide(const ProfileData &p, AppLanguage lang);
 lv_obj_t *build_error_screen_wide(const ProfileData &p, AppLanguage lang);
-lv_obj_t *build_settings_screen_wide(const ProfileData &p, AppLanguage lang);
+// --- Ecran Reglages : actions tactiles --------------------------------
+//
+// Chaque ligne modifiable declenche une action ; le bridge la traduit en
+// patch de configuration (voir AppController::applyConfigPatch) et
+// reconstruit l'ecran pour afficher la nouvelle valeur. Les lignes
+// informatives (profil) portent kNone.
+enum class WideSettingAction : uint8_t {
+    kNone,
+    kBrightness,    // cycle 25 / 50 / 75 / 100 %
+    kAutoRotate,    // bascule
+    kAnimations,    // bascule
+    kSyncInterval,  // cycle 15 / 30 / 60 / 120 min
+    kLanguage,      // bascule francais / anglais
+};
+
+using WideSettingHandler = void (*)(WideSettingAction action, void *owner);
+
+lv_obj_t *build_settings_screen_wide(const ProfileData &p, AppLanguage lang, WideSettingHandler handler,
+                                      void *owner);
 lv_obj_t *build_stat_screen_wide(StatIconKind icon_kind, const char *value, const char *caption, int sub_index,
                                   int sub_count);
 

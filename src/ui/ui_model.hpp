@@ -78,6 +78,10 @@ struct ProfileData {
     bool trophy_feed_available = true;
     bool has_ps_plus = false;
     bool reduced_motion = false;
+    // Refletent AppSettings pour que l'ecran Reglages affiche les vraies
+    // valeurs au lieu de constantes ecrites en dur.
+    bool auto_rotate = true;
+    int sync_interval_minutes = 30;
     int brightness = 82;
 };
 

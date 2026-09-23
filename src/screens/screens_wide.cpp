@@ -587,6 +587,9 @@ void wide_state_button(lv_obj_t *root, int x, int y, lv_color_t accent, bool err
 struct SettingsRowTouchContext {
     lv_obj_t *row;
     const char *name;
+    WideSettingAction action;
+    WideSettingHandler handler;
+    void *owner;
 };
 
 void settings_row_touch_event(lv_event_t *e) {
@@ -605,7 +608,11 @@ void settings_row_touch_event(lv_event_t *e) {
         return;
     }
     if(code == LV_EVENT_CLICKED) {
-        std::printf("[UI 7] Reglages ligne tactile: %s\n", ctx->name ? ctx->name : "-");
+        // Les lignes informatives (profil) portent kNone : elles gardent le
+        // retour visuel a l'appui, mais ne declenchent rien.
+        if(ctx->action != WideSettingAction::kNone && ctx->handler != nullptr) {
+            ctx->handler(ctx->action, ctx->owner);
+        }
         return;
     }
     if(code == LV_EVENT_DELETE) {
@@ -614,7 +621,8 @@ void settings_row_touch_event(lv_event_t *e) {
 }
 
 void settings_row_wide(lv_obj_t *root, int y, const char *icon, const char *name, const char *value, lv_color_t accent,
-                       int bar_pct = -1, bool toggle = false) {
+                       WideSettingAction action, WideSettingHandler handler, void *owner, int bar_pct = -1,
+                       bool toggle = false) {
     lv_obj_t *row = card(root, 77, y, 646, 44, 22, LV_OPA_80);
     lv_obj_set_style_border_color(row, accent, 0);
     lv_obj_set_style_border_opa(row, wide_opa_pct(78), 0);
@@ -640,7 +648,7 @@ void settings_row_wide(lv_obj_t *root, int y, const char *icon, const char *name
     lv_obj_set_size(hit, 646, 48);
     lv_obj_set_pos(hit, 77, y - 2);
     lv_obj_set_style_bg_opa(hit, LV_OPA_TRANSP, 0);
-    auto *ctx = new SettingsRowTouchContext{row, name};
+    auto *ctx = new SettingsRowTouchContext{row, name, action, handler, owner};
     lv_obj_add_event_cb(hit, settings_row_touch_event, LV_EVENT_ALL, ctx);
 }
 
@@ -1013,7 +1021,8 @@ lv_obj_t *build_error_screen_wide(const ProfileData &p, AppLanguage lang) {
     return root;
 }
 
-lv_obj_t *build_settings_screen_wide(const ProfileData &p, AppLanguage lang) {
+lv_obj_t *build_settings_screen_wide(const ProfileData &p, AppLanguage lang, WideSettingHandler handler,
+                                      void *owner) {
     lv_obj_t *root = wide_screen_root();
     ambient_rings(root, colors.accent_cyan);
     label(root, tr(lang, Str::kSettingsTitle), &td_font_28, colors.text_primary, 112, 64, 210, LV_TEXT_ALIGN_LEFT);
@@ -1022,17 +1031,37 @@ lv_obj_t *build_settings_screen_wide(const ProfileData &p, AppLanguage lang) {
     wide_bg_rect(root, 114, 125, 198, 2, colors.accent_cyan, LV_OPA_COVER, colors.accent_cyan, LV_OPA_TRANSP, 0, 1);
     make_status_badge(root, p.updated.c_str(), colors.success, 650, 67);
 
+    const bool fr = lang == AppLanguage::kFrench;
+    const char *on = fr ? "ON" : "ON";
+    const char *off = fr ? "OFF" : "OFF";
+
     char brightness[16];
     std::snprintf(brightness, sizeof(brightness), "%d %%", std::clamp(p.brightness, 0, 100));
     settings_row_wide(root, 133, "sun", tr(lang, Str::kBrightnessLabel), brightness, colors.accent_cyan,
-                      std::clamp(p.brightness, 0, 100));
-    settings_row_wide(root, 186, "rotate-ccw", "Rotation auto", "ON", lv_color_hex(0x52C6FF), -1, true);
-    settings_row_wide(root, 239, "sparkles", "Animations", p.reduced_motion ? "OFF" : "ON", colors.accent_violet,
-                      -1, !p.reduced_motion);
-    settings_row_wide(root, 292, "refresh-cw", tr(lang, Str::kRefreshLabel), "30 min", colors.gold);
-    settings_row_wide(root, 345, "gamepad-pro", tr(lang, Str::kProfileLabel),
-                      p.username.empty() ? "-" : p.username.c_str(), colors.success);
-    settings_row_wide(root, 398, "info", tr(lang, Str::kAboutLabel), "Version 1.0", colors.text_secondary);
+                      WideSettingAction::kBrightness, handler, owner, std::clamp(p.brightness, 0, 100));
+
+    settings_row_wide(root, 186, "rotate-ccw", tr(lang, Str::kAutoRotateLabel), p.auto_rotate ? on : off,
+                      lv_color_hex(0x52C6FF), WideSettingAction::kAutoRotate, handler, owner, -1, p.auto_rotate);
+
+    settings_row_wide(root, 239, "sparkles", tr(lang, Str::kAnimationsLabel), p.reduced_motion ? off : on,
+                      colors.accent_violet, WideSettingAction::kAnimations, handler, owner, -1, !p.reduced_motion);
+
+    char refresh[16];
+    std::snprintf(refresh, sizeof(refresh), "%d min", p.sync_interval_minutes);
+    settings_row_wide(root, 292, "refresh-cw", tr(lang, Str::kRefreshLabel), refresh, colors.gold,
+                      WideSettingAction::kSyncInterval, handler, owner);
+
+    // Remplace l'ancienne ligne "A propos" : l'ecran credits est deja dans
+    // le defilement automatique (slide 8), la dupliquer ici ne servait a
+    // rien -- alors qu'une bascule de langue accessible sans passer par le
+    // portail web change tout pour qui ne parle pas francais.
+    settings_row_wide(root, 345, "languages", tr(lang, Str::kLanguageLabel),
+                      tr(lang, fr ? Str::kLanguageFrench : Str::kLanguageEnglish), colors.accent_violet,
+                      WideSettingAction::kLanguage, handler, owner);
+
+    settings_row_wide(root, 398, "gamepad-pro", tr(lang, Str::kProfileLabel),
+                      p.username.empty() ? "-" : p.username.c_str(), colors.success, WideSettingAction::kNone,
+                      handler, owner);
 
     return root;
 }

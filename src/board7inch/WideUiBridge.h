@@ -49,6 +49,14 @@ class WideUiBridge : public UiBridge {
   // aussi etre appele avec le verrou esp_lv_adapter pris.
   void tick(uint32_t nowMillis);
 
+  // Chemin retour UI -> application. UiBridge est descendant par
+  // construction, et l'elargir toucherait aussi l'ecran rond : le point
+  // d'entree est donc injecte depuis main_7inch.cpp. Renvoie true si le
+  // patch a ete applique. Sans handler, l'ecran Reglages reste lisible
+  // mais inerte -- c'est le cas du simulateur de previsualisation.
+  using ConfigPatchFn = bool (*)(const char* json, void* owner);
+  void setConfigPatchHandler(ConfigPatchFn fn, void* owner);
+
   // UiBridge
   void setAppState(const AppState& state) override;
   void showSyncState(SyncState state) override;
@@ -79,6 +87,11 @@ class WideUiBridge : public UiBridge {
   void setInteractive(bool interactive);
   void attachNavLayer(lv_obj_t* screen);
   void openSettings();
+  static void onSettingAction(trophy::WideSettingAction action, void* owner);
+  // Meme raison que pour la navigation : un callback LVGL ne doit pas
+  // reconstruire l'ecran dans lequel il s'execute.
+  void applyPendingSetting();
+  void showSettingsScreen();
   void closeSettings();
   enum class StateScreenKind : uint8_t {
     kNone,
@@ -109,11 +122,15 @@ class WideUiBridge : public UiBridge {
   // detruit (voir showScreen()), jamais libere separement.
   lv_obj_t* navOverlay_ = nullptr;
 
-  // Action tactile en attente. Un callback LVGL (bouton ou geste)
-  // s'execute DANS l'arbre de l'ecran courant : s'il declenchait lui-meme
-  // le changement d'ecran, il detruirait l'objet en train de distribuer
-  // l'evenement. Les callbacks se contentent donc d'enregistrer
-  // l'intention, et tick() la realise une fois LVGL au repos.
+  // Callbacks LVGL : ils s'executent DANS l'arbre de l'ecran courant, donc
+  // ils n'y touchent jamais directement -- ils enregistrent une intention
+  // que tick() realise une fois LVGL au repos. Vaut pour la navigation
+  // comme pour les reglages.
+  ConfigPatchFn configPatch_ = nullptr;
+  void* configPatchOwner_ = nullptr;
+  bool settingPending_ = false;
+  trophy::WideSettingAction pendingSetting_ = trophy::WideSettingAction::kNone;
+
   bool navPending_ = false;
   trophy::WideNavAction pendingAction_ = trophy::WideNavAction::kNext;
   int pendingTarget_ = 0;

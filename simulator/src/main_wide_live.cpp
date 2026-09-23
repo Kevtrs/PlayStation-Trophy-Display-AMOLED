@@ -30,6 +30,7 @@
 #include "data/DemoDataProvider.h"
 #include "storage/FilePersistentStore.h"
 #include "theme/theme.hpp"
+#include "utils/Logger.h"
 #include "ui/layout_wide.hpp"
 
 namespace {
@@ -74,7 +75,7 @@ lv_obj_t* buildForcedScreen(const std::string& screenName) {
   if (screenName == "sync") return trophy::build_sync_screen_wide(trophy::SyncState::Fetching, 64, AppLanguage::kFrench);
   if (screenName == "offline") return trophy::build_offline_screen_wide(p, AppLanguage::kFrench);
   if (screenName == "error") return trophy::build_error_screen_wide(p, AppLanguage::kFrench);
-  if (screenName == "settings") return trophy::build_settings_screen_wide(p, AppLanguage::kFrench);
+  if (screenName == "settings") return trophy::build_settings_screen_wide(p, AppLanguage::kFrench, nullptr, nullptr);
   if (screenName == "about") return trophy::build_credits_screen_wide(AppLanguage::kFrench);
   // Deux cas de celebration : un seul palier (le plus courant) et
   // plusieurs paliers d'un coup (affiche le detail par palier).
@@ -118,6 +119,20 @@ struct ScriptedGesture {
 };
 constexpr Uint32 kTapHoldMs = 120;
 constexpr Uint32 kSwipeDurationMs = 220;
+
+namespace {
+// Trampoline entre l'ecran Reglages et la configuration persistante :
+// meme chemin que POST /api/config, donc sauvegarde sur disque et
+// services reconfigures sans redemarrage.
+bool applyConfigFromUi(const char* json, void* owner) {
+  auto* controller = static_cast<AppController*>(owner);
+  if (controller == nullptr || json == nullptr) return false;
+  std::string error;
+  if (controller->applyConfigPatch(json, error)) return true;
+  Logger::warn("[UI 7\"] Patch de configuration refuse : %s", error.c_str());
+  return false;
+}
+}  // namespace
 
 int main(int argc, char** argv) {
   std::vector<ScriptedGesture> taps;
@@ -179,6 +194,9 @@ int main(int argc, char** argv) {
   WideUiBridge wideUi;
 
   AppController appController(configStore, cacheStore, demoProvider, brightness, wifiStub, wideUi);
+  // Chemin retour de l'ecran Reglages : sans lui, les lignes gardent
+  // leur retour visuel mais ne changent rien.
+  wideUi.setConfigPatchHandler(&applyConfigFromUi, &appController);
 
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
     std::fprintf(stderr, "SDL_Init a echoue: %s\n", SDL_GetError());

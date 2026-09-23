@@ -83,6 +83,11 @@ enum class Str {
     kAnimationsActive,
     kProfileLabel,
     kRefreshLabel,
+    kAutoRotateLabel,   // ecran Reglages 7" : etaient ecrits en dur en
+    kAnimationsLabel,   // francais, donc intraduisibles depuis la bascule
+    kLanguageLabel,     // de langue ajoutee sur ce meme ecran
+    kLanguageFrench,
+    kLanguageEnglish,
     kSimulateValue,
     kCelebrationLabel,
     kTestValue,

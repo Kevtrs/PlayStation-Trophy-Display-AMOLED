@@ -213,6 +213,8 @@ trophy::ProfileData WideUiBridge::mapProfile(const AppState& state) const {
   p.has_ps_plus = state.profile.hasPsPlus;
   p.brightness = state.settings.brightnessPercent;
   p.reduced_motion = !state.settings.animationsEnabled;
+  p.auto_rotate = state.settings.autoRotateEnabled;
+  p.sync_interval_minutes = state.settings.syncIntervalMinutes;
   return p;
 }
 
@@ -381,9 +383,87 @@ void WideUiBridge::setInteractive(bool interactive) {
 
 void WideUiBridge::openSettings() {
   if (showingSettings_) return;
-  lv_obj_t* next = trophy::build_settings_screen_wide(profile_, language_);
-  if (next == nullptr) return;
   showingSettings_ = true;
+  showSettingsScreen();
+}
+
+void WideUiBridge::setConfigPatchHandler(ConfigPatchFn fn, void* owner) {
+  configPatch_ = fn;
+  configPatchOwner_ = owner;
+}
+
+void WideUiBridge::onSettingAction(trophy::WideSettingAction action, void* owner) {
+  auto* self = static_cast<WideUiBridge*>(owner);
+  if (self == nullptr) return;
+  self->noteTouchActivity();
+  if (self->nowMillis_ - self->lastNavMs_ < kNavDebounceMs) return;
+  self->lastNavMs_ = self->nowMillis_;
+  self->settingPending_ = true;
+  self->pendingSetting_ = action;
+}
+
+void WideUiBridge::applyPendingSetting() {
+  if (!settingPending_) return;
+  settingPending_ = false;
+  const trophy::WideSettingAction action = pendingSetting_;
+
+  // Sans chemin retour (simulateur de previsualisation), l'ecran reste
+  // lisible mais inerte plutot que de mentir sur un changement applique.
+  if (configPatch_ == nullptr) return;
+
+  // Patch partiel : ConfigManager::applyJsonPatch n'applique que les
+  // champs presents, les autres reglages sont donc preserves.
+  char json[96];
+  switch (action) {
+    case trophy::WideSettingAction::kBrightness: {
+      // Cycle 25 -> 50 -> 75 -> 100 -> 25. Pas de curseur : viser une
+      // valeur precise au doigt sur une barre de 86 px serait penible,
+      // alors que quatre paliers se traversent en quatre appuis.
+      const int current = profile_.brightness < 0 ? 0 : (profile_.brightness > 100 ? 100 : profile_.brightness);
+      const int next = ((current / 25) % 4 + 1) * 25;
+      std::snprintf(json, sizeof(json), "{%cbrightnessPercent%c:%d}", '"', '"', next);
+      break;
+    }
+    case trophy::WideSettingAction::kAutoRotate:
+      std::snprintf(json, sizeof(json), "{%cautoRotateEnabled%c:%s}", '"', '"', profile_.auto_rotate ? "false" : "true");
+      break;
+    case trophy::WideSettingAction::kAnimations:
+      std::snprintf(json, sizeof(json), "{%canimationsEnabled%c:%s}", '"', '"',
+                    profile_.reduced_motion ? "true" : "false");
+      break;
+    case trophy::WideSettingAction::kSyncInterval: {
+      // Cycle 15 -> 30 -> 60 -> 120 min. Pocket PSN est un service tiers
+      // gratuit : ne pas proposer plus court que 15 min.
+      int next = 15;
+      if (profile_.sync_interval_minutes < 30) next = 30;
+      else if (profile_.sync_interval_minutes < 60) next = 60;
+      else if (profile_.sync_interval_minutes < 120) next = 120;
+      std::snprintf(json, sizeof(json), "{%csyncIntervalMinutes%c:%d}", '"', '"', next);
+      break;
+    }
+    case trophy::WideSettingAction::kLanguage:
+      std::snprintf(json, sizeof(json), "{%clanguage%c:%c%s%c}", '"', '"', '"',
+                    language_ == AppLanguage::kFrench ? "en" : "fr", '"');
+      break;
+    case trophy::WideSettingAction::kNone:
+      return;
+  }
+
+  if (!configPatch_(json, configPatchOwner_)) {
+    Logger::warn("[UI 7\"] Reglage refuse par la configuration : %s", json);
+    return;
+  }
+  Logger::info("[UI 7\"] Reglage applique : %s", json);
+
+  // AppController::applyConfigPatch republie l'etat avant de rendre la
+  // main, donc profile_ et language_ portent deja la nouvelle valeur :
+  // reconstruire l'ecran suffit a la montrer.
+  if (showingSettings_) showSettingsScreen();
+}
+
+void WideUiBridge::showSettingsScreen() {
+  lv_obj_t* next = trophy::build_settings_screen_wide(profile_, language_, &WideUiBridge::onSettingAction, this);
+  if (next == nullptr) return;
   showScreen(next);
   lv_obj_add_event_cb(next, &WideUiBridge::onScreenGesture, LV_EVENT_GESTURE, this);
   // Le retour reste visible en permanence sur cet ecran : on y arrive
@@ -491,6 +571,7 @@ void WideUiBridge::tick(uint32_t nowMillis) {
   // LVGL est au repos a cet instant : c'est le seul endroit sur pour
   // detruire et reconstruire un ecran.
   applyPendingNav();
+  applyPendingSetting();
 
   if (interactive_) {
     if (nowMillis - lastTouchMs_ < kIdleResumeMs) return;  // quelqu'un a la main

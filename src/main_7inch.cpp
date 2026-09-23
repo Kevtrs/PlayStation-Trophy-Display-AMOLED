@@ -130,6 +130,20 @@ Touch* createPollingGt911Touch(LCD* lcd) {
 
 }  // namespace
 
+namespace {
+// Trampoline entre l'ecran Reglages et la configuration persistante :
+// meme chemin que POST /api/config, donc sauvegarde sur disque et
+// services reconfigures sans redemarrage.
+bool applyConfigFromUi(const char* json, void* owner) {
+  auto* controller = static_cast<AppController*>(owner);
+  if (controller == nullptr || json == nullptr) return false;
+  std::string error;
+  if (controller->applyConfigPatch(json, error)) return true;
+  Logger::warn("[UI 7\"] Patch de configuration refuse : %s", error.c_str());
+  return false;
+}
+}  // namespace
+
 void setup() {
   Serial.begin(115200);
   delay(300);  // laisse le temps au moniteur serie de se connecter
@@ -220,6 +234,10 @@ void setup() {
   appController = new AppController(persistentStore, persistentStore, *activeProvider, *brightnessBackend,
                                      wifiManager, wideUi);
   captivePortalServer = new CaptivePortalServer(*appController);
+  // Chemin retour de l'ecran Reglages vers la configuration persistante,
+  // le meme que celui du portail web. Sans lui, les lignes de reglages
+  // gardent leur retour visuel a l'appui mais ne changent rien.
+  wideUi.setConfigPatchHandler(&applyConfigFromUi, appController);
 
   esp_lv_adapter_lock(-1);
   // MANQUAIT ICI (bug reel trouve au tout premier flash materiel, retour
