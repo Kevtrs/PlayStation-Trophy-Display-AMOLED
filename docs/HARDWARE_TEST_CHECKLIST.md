@@ -1,4 +1,9 @@
-# Checklist de validation materielle (premiere fois)
+# Checklist de validation materielle -- ecran rond (premiere fois)
+
+> Cette checklist couvre le board **rond** (AMOLED 466x466, CO5300,
+> tactile CST9217). Pour le board 7" (Waveshare ESP32-S3-Touch-LCD-7,
+> panneau RGB 800x480, tactile GT911), voir
+> [`HARDWARE_TEST_CHECKLIST_7INCH.md`](HARDWARE_TEST_CHECKLIST_7INCH.md).
 
 A remplir lors de la toute premiere validation sur l'ESP32-S3 et l'ecran
 AMOLED reels. Tout le reste (logique metier, parser, cache, reconnexion,
